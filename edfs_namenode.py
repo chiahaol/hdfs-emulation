@@ -3,14 +3,13 @@ import asyncio
 from config import *
 
 async def handle_client(reader, writer):
-    while True:
-        data = await reader.read(100)
-        message = data.decode()
+    data = await reader.read(100)
+    message = data.decode()
 
-        print(f'Client message: {message}')
+    print(f'Client message: {message}')
 
-        writer.write(b'NameNode successfully received the message!')
-        await writer.drain()
+    writer.write(b'NameNode successfully received the message!')
+    await writer.drain()
     writer.close()
 
 async def main():
