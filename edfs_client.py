@@ -63,12 +63,18 @@ async def ls(reader, writer):
             print(ent)
 
 async def mkdir(reader, writer):
-    message = "mkdir"
+    path = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_BASE_DIR
+    message = json.dumps({"cmd": CMD_MKDIR, "path": path})
     writer.write(message.encode())
     await writer.drain()
 
-    data = await reader.read(100)
-    print(f'{data.decode()!r}')
+    data = await reader.read(BUF_LEN)
+    response = json.loads(data.decode())
+    success = response.get("success")
+    if not success:
+        print(response.get("msg"))
+    else:
+        print(response.get("msg"))
 
 async def rmdir(reader, writer):
     message = "rmdir"

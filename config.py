@@ -25,9 +25,14 @@ CMD_PUT = 106
 CMD_GET = 107
 CMD_TREE = 108
 
+# edit log types
+EDIT_TYPE_MKDIR = 200
+
 # Metadata
 NAMENODE_METADATA_DIR = "./tmp/name"
 FSIMAGE_FILENAME = "fsimage.json"
+
+EDIT_LOG_PREFIX = "edits_"
 
 #Inode
 DIR_TYPE = "DIRECTORY"

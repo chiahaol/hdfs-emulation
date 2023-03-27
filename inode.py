@@ -101,8 +101,24 @@ class InodeManager():
             if s == "": continue
             cur_inode = cur_inode.get_child_inode_by_name(s)
             if cur_inode is None:
-                return None
+                break
         return cur_inode
+
+    def get_baseinode_and_filename(self, path):
+        path = path.strip(' /')
+        path_list = path.split("/")
+
+        filename = path_list.pop()
+        base_dir_inode = self.get_inode_from_path("/".join(path_list))
+
+        return (base_dir_inode, filename)
+
+    def create_dir(self, base_inode, filename):
+        new_dir_inode = Inode(self.last_inode_id + 1, DIR_TYPE, filename)
+        base_inode.add_dirent(new_dir_inode, filename)
+        new_dir_inode.add_dirent(base_inode, "..")
+        self.last_inode_id += 1
+        return new_dir_inode
 
     def print_entries(self, dir_inode):
         dir_path = dir_inode.get_path()
