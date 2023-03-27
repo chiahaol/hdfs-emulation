@@ -22,6 +22,18 @@ class Inode:
     def get_name(self):
         return self.name
 
+    def get_type(self):
+        return self.type
+
+    def get_replication(self):
+        return self.replication
+
+    def get_preferredBlockSize(self):
+        return self.preferredBlockSize
+
+    def get_blocks(self):
+        return self.blocks
+
     def get_dirents(self):
         return self.dir_entries
 
@@ -38,6 +50,13 @@ class Inode:
             if dirent.name == name:
                 return dirent.inode
         return None
+
+    def get_children_ids(self):
+        children_ids = []
+        for dirent in self.get_dirents():
+            if  dirent.name != "." and dirent.name != "..":
+                children_ids.append(dirent.inode.get_id())
+        return children_ids
 
     def get_path(self):
         cur = self
@@ -117,8 +136,16 @@ class InodeManager():
         new_dir_inode = Inode(self.last_inode_id + 1, DIR_TYPE, filename)
         base_inode.add_dirent(new_dir_inode, filename)
         new_dir_inode.add_dirent(base_inode, "..")
+        self.id_to_inode[new_dir_inode.get_id()] = new_dir_inode
         self.last_inode_id += 1
         return new_dir_inode
+
+    def remove_dir(self, parent, inode):
+        dirents = parent.get_dirents()
+        for i, dirent in enumerate(dirents):
+            if dirent.name == inode.get_name():
+                dirents.pop(i)
+        del self.id_to_inode[inode.get_id()]
 
     def print_entries(self, dir_inode):
         dir_path = dir_inode.get_path()

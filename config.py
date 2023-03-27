@@ -27,6 +27,7 @@ CMD_TREE = 108
 
 # edit log types
 EDIT_TYPE_MKDIR = 200
+EDIT_TYPE_RMDIR = 201
 
 # Metadata
 NAMENODE_METADATA_DIR = "./tmp/name"
