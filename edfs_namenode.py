@@ -29,7 +29,7 @@ class NameNode:
         self.metadata = MetaData()
         self.im = InodeManager()
         self.im.build_inodes(self.metadata.fsimage)
-        #self.im.print_recursive(self.im.root_inode, 0)
+        # self.im.print_recursive(self.im.root_inode, 0)
 
     async def handle_client(self, reader, writer):
         data = await reader.read(100)
