@@ -1,27 +1,42 @@
 # socket
 LOCAL_HOST = '127.0.0.1'
 NAMENODE_PORT = 5555
+BUF_LEN = 65536
 
-# client commands
-CMD_LS = "-ls"
-CMD_MKDIR = "-mkdir"
-CMD_RMDIR = "-rmdir"
-CMD_TOUCH = "-touch"
-CMD_RM = "-rm"
-CMD_CAT = "-cat"
-CMD_PUT = "-put"
-CMD_GET = "-get"
+# client program command line commands
+CLI_LS = "-ls"
+CLI_MKDIR = "-mkdir"
+CLI_RMDIR = "-rmdir"
+CLI_TOUCH = "-touch"
+CLI_RM = "-rm"
+CLI_CAT = "-cat"
+CLI_PUT = "-put"
+CLI_GET = "-get"
+CLI_TREE = "-tree"
+
+# client to namenode commands
+CMD_LS = 100
+CMD_MKDIR = 101
+CMD_RMDIR = 102
+CMD_TOUCH = 103
+CMD_RM = 104
+CMD_CAT = 105
+CMD_PUT = 106
+CMD_GET = 107
+CMD_TREE = 108
 
 # Metadata
 NAMENODE_METADATA_DIR = "./tmp/name"
 FSIMAGE_FILENAME = "fsimage.json"
 
-DEFAULT_BASE_DIR = "/user/ubuntu"
-
-INODE_ID_START = 1000
-BLOCK_ID_START = 2000
-
 #Inode
 DIR_TYPE = "DIRECTORY"
 FILE_TYPE = "FILE"
 ROOT_DIR_NAME = ""
+DEFAULT_BASE_DIR = "/user/ubuntu"
+
+INODE_ID_START = 1000
+
+
+# Block
+BLOCK_ID_START = 2000
