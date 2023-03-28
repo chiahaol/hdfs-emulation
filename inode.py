@@ -76,6 +76,7 @@ class DirEnt:
 class InodeManager():
     def __init__(self):
         self.last_inode_id = INODE_ID_START
+        self.last_block_id = BLOCK_ID_START
         self.id_to_inode = {}
         self.root_inode = None
 

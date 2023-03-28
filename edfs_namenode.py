@@ -25,7 +25,7 @@ class EDFSNameNode:
             await self.mkdir(writer, message.get("path"))
         elif command == CMD_RMDIR:
             await self.rmdir(writer, message.get("path"))
-        elif command == CMD_TOUCH:
+        elif command == CMD_CREATE:
             pass
         elif command == CMD_RM:
             pass

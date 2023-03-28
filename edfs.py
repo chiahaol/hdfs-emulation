@@ -13,8 +13,7 @@ async def main():
         print("Please provide a edfs command!")
         exit(-1)
 
-    edfs_client = EDFSClient()
-    await edfs_client.connect_namenode()
+    edfs_client = await EDFSClient.create()
 
     command = sys.argv[1]
     if command == CLI_LS:
@@ -39,7 +38,12 @@ async def main():
     elif command == CLI_CAT:
         await edfs_client.cat()
     elif command == CLI_PUT:
-        await edfs_client.put()
+        if len(sys.argv) < 3:
+            print("-put: Not enough arguments: expected 1 but got 0")
+            exit(-1)
+        local_path = sys.argv[2]
+        remote_path = sys.argv[3] if len(sys.argv) > 3 else DEFAULT_BASE_DIR
+        await edfs_client.put(local_path, remote_path)
     elif command == CLI_GET:
         await edfs_client.get()
     elif command == CLI_TREE:

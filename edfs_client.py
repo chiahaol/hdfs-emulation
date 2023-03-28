@@ -3,21 +3,26 @@ import json
 import sys
 
 from config import *
+from distributed_file_system import DistributedFileSystem
 
 
 class EDFSClient:
-    def __init__(self):
-        self.namenode_reader = None
-        self.namenode_writer = None
-
-    async def connect_namenode(self, ip=LOCAL_HOST, port=NAMENODE_PORT):
+    @classmethod
+    async def create(cls):
+        self = EDFSClient()
         self.namenode_reader, self.namenode_writer = await asyncio.open_connection(
-            ip, port
+            LOCAL_HOST, NAMENODE_PORT
         )
+        self.dfs = await DistributedFileSystem.create_instance()
+        return self
+
+    def __init__(self):
+        pass
 
     def close(self):
         if self.namenode_writer:
             self.namenode_writer.close()
+        self.dfs.close()
 
     async def ls(self, path):
         message = json.dumps({"cmd": CMD_LS, "path": path})
@@ -84,20 +89,15 @@ class EDFSClient:
         data = await self.namenode_reader.read(100)
         print(f'{data.decode()!r}')
 
-    async def put(self):
-        if len(sys.argv) < 3:
-            print("-put: Not enough arguments: expected 1 but got 0")
-            exit(-1)
-
-        local_path = sys.argv[2]
-        remote_path = sys.argv[3] if len(sys.argv) > 3 else DEFAULT_BASE_DIR
-        message = json.dumps({"cmd": CMD_PUT, "local_path": local_path, "remote_path": remote_path})
-        self.namenode_writer.write(message.encode())
-        await self.namenode_writer.drain()
-
-        data = await self.namenode_reader.read(BUF_LEN)
-        response = json.loads(data.decode())
-        print(response)
+    async def put(self, local_path, remote_path):
+        out_stream = await self.dfs.create(remote_path)
+        out_stream.open()
+        with open(local_path, 'r') as f:
+            while True:
+                data = f.read(DEFAULT_FILE_PACKET_SIZE).encode()
+                if len(data) == 0: break
+                await out_stream.write(data, 0, len(data))
+        await out_stream.close()
 
     async def get(self):
         message = "get"
