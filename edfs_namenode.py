@@ -6,7 +6,7 @@ from config import *
 from inode import Inode, InodeManager
 
 
-class NameNode:
+class EDFSNameNode:
     def __init__(self):
         self.last_edit_log_id = 0
         self.fsimage = self.read_fsimage();
@@ -37,10 +37,7 @@ class NameNode:
             pass
         elif command == CMD_TREE:
             await self.tree(writer, message["path"])
-        print(f'Client message: {message}')
 
-        # writer.write(b'NameNode successfully received the message!')
-        # await writer.drain()
         writer.close()
 
     async def ls(self, writer, path):
@@ -209,7 +206,7 @@ class NameNode:
 
 
 async def main():
-    namenode = NameNode()
+    namenode = EDFSNameNode()
     server = await asyncio.start_server(
         namenode.handle_client, LOCAL_HOST, NAMENODE_PORT)
 

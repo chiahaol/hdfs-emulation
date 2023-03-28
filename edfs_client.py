@@ -1,6 +1,3 @@
-# more details at:
-#   https://docs.python.org/3/library/asyncio-stream.html#examples
-
 import asyncio
 import json
 import sys
@@ -8,143 +5,118 @@ import sys
 from config import *
 
 
-async def main():
-    reader, writer = await asyncio.open_connection(
-        LOCAL_HOST, NAMENODE_PORT
-    )
+class EDFSClient:
+    def __init__(self):
+        self.namenode_reader = None
+        self.namenode_writer = None
 
-    if (len(sys.argv) < 2):
-        print("Please provide a edfs command!")
-        exit(-1)
+    async def connect_namenode(self, ip=LOCAL_HOST, port=NAMENODE_PORT):
+        self.namenode_reader, self.namenode_writer = await asyncio.open_connection(
+            ip, port
+        )
 
-    command = sys.argv[1]
-    if command == CLI_LS:
-        await ls(reader, writer)
-    elif command == CLI_MKDIR:
-        await mkdir(reader, writer)
-    elif command == CLI_RMDIR:
-        await rmdir(reader, writer)
-    elif command == CLI_TOUCH:
-        await touch(reader, writer)
-    elif command == CLI_RM:
-        await rm(reader, writer)
-    elif command == CLI_CAT:
-        await cat(reader, writer)
-    elif command == CLI_PUT:
-        await put(reader, writer)
-    elif command == CLI_GET:
-        await get(reader, writer)
-    elif command == CLI_TREE:
-        await tree(reader, writer)
-    else:
-        print(f'Command not found: {command}')
-        exit(-1)
+    def close(self):
+        if self.namenode_writer:
+            self.namenode_writer.close()
 
-    writer.close()
+    async def ls(self, path):
+        message = json.dumps({"cmd": CMD_LS, "path": path})
+        self.namenode_writer.write(message.encode())
+        await self.namenode_writer.drain()
 
-async def ls(reader, writer):
-    path = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_BASE_DIR
-    message = json.dumps({"cmd": CMD_LS, "path": path})
-    writer.write(message.encode())
-    await writer.drain()
+        data = await  self.namenode_reader.read(BUF_LEN)
+        response = json.loads(data.decode())
+        success = response.get("success")
+        if not success:
+            print(response.get("msg"))
+        else:
+            entries = response.get("entries")
+            if not entries:
+                return
 
-    data = await reader.read(BUF_LEN)
-    response = json.loads(data.decode())
-    success = response.get("success")
-    if not success:
-        print(response.get("msg"))
-    else:
-        entries = response.get("entries")
-        if not entries:
-            return
+            print(f'Found {len(entries)} items')
+            for ent in entries:
+                print(ent)
 
-        print(f'Found {len(entries)} items')
-        for ent in entries:
-            print(ent)
+    async def mkdir(self, path):
+        message = json.dumps({"cmd": CMD_MKDIR, "path": path})
+        self.namenode_writer.write(message.encode())
+        await self.namenode_writer.drain()
 
-async def mkdir(reader, writer):
-    path = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_BASE_DIR
-    message = json.dumps({"cmd": CMD_MKDIR, "path": path})
-    writer.write(message.encode())
-    await writer.drain()
+        data = await self.namenode_reader.read(BUF_LEN)
+        response = json.loads(data.decode())
+        success = response.get("success")
+        if not success:
+            print(response.get("msg"))
 
-    data = await reader.read(BUF_LEN)
-    response = json.loads(data.decode())
-    success = response.get("success")
-    if not success:
-        print(response.get("msg"))
-    else:
-        print(response.get("msg"))
+    async def rmdir(self, path):
+        message = json.dumps({"cmd": CMD_RMDIR, "path": path})
+        self.namenode_writer.write(message.encode())
+        await self.namenode_writer.drain()
 
-async def rmdir(reader, writer):
-    path = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_BASE_DIR
-    message = json.dumps({"cmd": CMD_RMDIR, "path": path})
-    writer.write(message.encode())
-    await writer.drain()
+        data = await self.namenode_reader.read(BUF_LEN)
+        response = json.loads(data.decode())
+        success = response.get("success")
+        if not success:
+            print(response.get("msg"))
 
-    data = await reader.read(BUF_LEN)
-    response = json.loads(data.decode())
-    success = response.get("success")
-    if not success:
-        print(response.get("msg"))
-    else:
-        print(response.get("msg"))
+    async def touch(self):
+        message = "touch"
+        self.namenode_writer.write(message.encode())
+        await self.namenode_writer.drain()
 
+        data = await self.namenode_reader.read(100)
+        print(f'{data.decode()!r}')
 
-async def touch(reader, writer):
-    message = "touch"
-    writer.write(message.encode())
-    await writer.drain()
+    async def rm(self):
+        message = "rm"
+        self.namenode_writer.write(message.encode())
+        await self.namenode_writer.drain()
 
-    data = await reader.read(100)
-    print(f'{data.decode()!r}')
+        data = await self.namenode_reader.read(100)
+        print(f'{data.decode()!r}')
 
-async def rm(reader, writer):
-    message = "rm"
-    writer.write(message.encode())
-    await writer.drain()
+    async def cat(self):
+        message = "cat"
+        self.namenode_writer.write(message.encode())
+        await self.namenode_writer.drain()
 
-    data = await reader.read(100)
-    print(f'{data.decode()!r}')
+        data = await self.namenode_reader.read(100)
+        print(f'{data.decode()!r}')
 
-async def cat(reader, writer):
-    message = "cat"
-    writer.write(message.encode())
-    await writer.drain()
+    async def put(self):
+        if len(sys.argv) < 3:
+            print("-put: Not enough arguments: expected 1 but got 0")
+            exit(-1)
 
-    data = await reader.read(100)
-    print(f'{data.decode()!r}')
+        local_path = sys.argv[2]
+        remote_path = sys.argv[3] if len(sys.argv) > 3 else DEFAULT_BASE_DIR
+        message = json.dumps({"cmd": CMD_PUT, "local_path": local_path, "remote_path": remote_path})
+        self.namenode_writer.write(message.encode())
+        await self.namenode_writer.drain()
 
-async def put(reader, writer):
-    message = "put"
-    writer.write(message.encode())
-    await writer.drain()
+        data = await self.namenode_reader.read(BUF_LEN)
+        response = json.loads(data.decode())
+        print(response)
 
-    data = await reader.read(100)
-    print(f'{data.decode()!r}')
+    async def get(self):
+        message = "get"
+        self.namenode_writer.write(message.encode())
+        await self.namenode_writer.drain()
 
-async def get(reader, writer):
-    message = "get"
-    writer.write(message.encode())
-    await writer.drain()
+        data = await self.namenode_reader.read(100)
+        print(f'{data.decode()!r}')
 
-    data = await reader.read(100)
-    print(f'{data.decode()!r}')
+    async def tree(self, path):
+        message = json.dumps({"cmd": CMD_TREE, "path": path})
+        self.namenode_writer.write(message.encode())
+        await self.namenode_writer.drain()
 
-async def tree(reader, writer):
-    path = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_BASE_DIR
-    message = json.dumps({"cmd": CMD_TREE, "path": path})
-    writer.write(message.encode())
-    await writer.drain()
-
-    data = await reader.read(BUF_LEN)
-    response = json.loads(data.decode())
-    success = response.get("success")
-    if not success:
-        print(response.get("msg"))
-    else:
-        dir_tree = response.get("output")
-        print(dir_tree)
-
-if __name__ == "__main__":
-    asyncio.run(main())
+        data = await self.namenode_reader.read(BUF_LEN)
+        response = json.loads(data.decode())
+        success = response.get("success")
+        if not success:
+            print(response.get("msg"))
+        else:
+            dir_tree = response.get("output")
+            print(dir_tree)
