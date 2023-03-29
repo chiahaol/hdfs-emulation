@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import sys
 
 from config import *
@@ -89,14 +90,13 @@ class EDFSClient:
         data = await self.namenode_reader.read(100)
         print(f'{data.decode()!r}')
 
-    async def put(self, local_path, remote_path):
-        out_stream = await self.dfs.create(remote_path)
-        out_stream.open()
-        with open(local_path, 'r') as f:
-            while True:
-                data = f.read(DEFAULT_FILE_PACKET_SIZE).encode()
-                if len(data) == 0: break
-                await out_stream.write(data, 0, len(data))
+    # TODO: currently only support file types
+    # Should implement recursive put all files in a directory in the future
+    async def put(self, local_path, remote_dir):
+        out_stream = await self.dfs.create(f'{remote_dir}/{os.path.basename(local_path)}')
+        if not out_stream:
+            return
+        await out_stream.write_file(local_path)
         await out_stream.close()
 
     async def get(self):

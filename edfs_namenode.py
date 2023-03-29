@@ -2,17 +2,17 @@ import asyncio
 import json
 import os
 
+from block_manager import BlockManager
 from config import *
-from inode import Inode, InodeManager
+from editlog_manager import EditLogManager
+from inode_manager import InodeManager
 
 
 class EDFSNameNode:
     def __init__(self):
-        self.last_edit_log_id = 0
-        self.fsimage = self.read_fsimage();
-        self.im = InodeManager()
-        self.im.build_inodes(self.fsimage)
-        self.process_edit_logs()
+        self.im = InodeManager(self.read_fsimage())
+        self.bm = BlockManager(self.im)
+        self.elm = EditLogManager(self.im)
         self.take_snapshot()
 
     async def handle_client(self, reader, writer):
@@ -26,7 +26,7 @@ class EDFSNameNode:
         elif command == CMD_RMDIR:
             await self.rmdir(writer, message.get("path"))
         elif command == CMD_CREATE:
-            pass
+            await self.create(writer, message.get("path"))
         elif command == CMD_RM:
             pass
         elif command == CMD_CAT:
@@ -37,6 +37,8 @@ class EDFSNameNode:
             pass
         elif command == CMD_TREE:
             await self.tree(writer, message["path"])
+        elif command == DN_CMD_REGISTER:
+            await self.register_datanode(writer, message)
 
         writer.close()
 
@@ -63,19 +65,14 @@ class EDFSNameNode:
         base_dir_inode, filename = self.im.get_baseinode_and_filename(path)
         if base_dir_inode is None:
             response = {"success": False, "msg": f'mkdir: {os.path.dirname(path.strip(" /"))}: No such file or directory'}
-            writer.write(json.dumps(response).encode())
-            return
         elif filename == "" or base_dir_inode.get_child_inode_by_name(filename) != None:
             response = {"success": False, "msg": f'mkdir: {path}: File exists'}
-            writer.write(json.dumps(response).encode())
-            return
+        else:
+            new_dir_inode = self.im.create_dir(base_dir_inode, filename)
+            log = {"edit_type": EDIT_TYPE_MKDIR, "parent": base_dir_inode.get_id(), "name": new_dir_inode.get_name()}
+            self.elm.write_log(log)
+            response = {"success": True, "msg": f'mkdir: {path}: successfully created with inode number {new_dir_inode.get_id()}'}
 
-        new_dir_inode = self.im.create_dir(base_dir_inode, filename)
-        log = {"edit_type": EDIT_TYPE_MKDIR, "parent": base_dir_inode.get_id(), "name": new_dir_inode.get_name()}
-        with open(self.get_next_edit_log_filename(), 'w') as output:
-            json.dump(log, output)
-
-        response = {"success": True, "msg": f'mkdir: {path}: successfully created with inode number {new_dir_inode.get_id()}'}
         writer.write(json.dumps(response).encode())
         await writer.drain()
 
@@ -93,12 +90,26 @@ class EDFSNameNode:
             parent = inode.get_parent_inode()
             self.im.remove_dir(parent, inode)
             log = {"edit_type": EDIT_TYPE_RMDIR, "parent": parent.get_id(), "remove": inode.get_id(), "name": inode.get_name()}
-            with open(self.get_next_edit_log_filename(), 'w') as output:
-                json.dump(log, output)
+            self.elm.write_log(log)
             response = {"success": True, "msg": f'rmdir: {path}: successfully removed the directory'}
 
         writer.write(json.dumps(response).encode())
         await writer.drain()
+
+    async def create(self, writer, path):
+        base_dir_inode, filename = self.im.get_baseinode_and_filename(path)
+        if base_dir_inode is None:
+            response = {"success": False, "error": ERR_FILE_NOT_FOUND}
+        elif filename == "" or base_dir_inode.get_child_inode_by_name(filename) != None:
+            response = {"success": False, "error": ERR_FILE_EXIST}
+        else:
+            new_dir_inode = self.im.create_file(base_dir_inode, filename)
+            log = {"edit_type": EDIT_TYPE_CREATE, "parent": base_dir_inode.get_id(), "name": new_dir_inode.get_name()}
+            self.elm.write_log(log)
+            response = {"success": True}
+
+        writer.write(json.dumps(response).encode())
+        return
 
     async def tree(self, writer, path):
         inode = self.im.get_inode_from_path(path)
@@ -137,41 +148,9 @@ class EDFSNameNode:
 
         return fsimage
 
-    def process_edit_logs(self):
-        edit_log_filenames = [filename for filename in os.listdir(NAMENODE_METADATA_DIR) if filename.startswith(EDIT_LOG_PREFIX)]
-        edit_log_filenames.sort()
-        for filename in edit_log_filenames:
-            with open(f'{NAMENODE_METADATA_DIR}/{filename}', 'r') as f:
-                log = json.load(f)
-
-            edit_type = log.get("edit_type")
-            if edit_type == EDIT_TYPE_MKDIR:
-                self.process_mkdir_editlog(log)
-            elif edit_type == EDIT_TYPE_RMDIR:
-                self.process_rmdir_editlog(log)
-
-
-    def process_mkdir_editlog(self, log):
-        parent_id,  name = log.get("parent"), log.get("name")
-        parent_inode = self.im.id_to_inode[parent_id]
-        self.im.create_dir(parent_inode, name)
-
-    def process_rmdir_editlog(self, log):
-        parent_id, remove_id, name = log.get("parent"), log.get("remove"), log.get("name")
-        parent_inode = self.im.id_to_inode[parent_id]
-        remove_inode = self.im.id_to_inode[remove_id]
-        self.im.remove_dir(parent_inode, remove_inode)
-
-    def get_next_edit_log_filename(self):
-        self.last_edit_log_id += 1
-        return f'{NAMENODE_METADATA_DIR}/{EDIT_LOG_PREFIX}{"0" * (8 - len(str(self.last_edit_log_id)))}{self.last_edit_log_id}'
-
-    def remove_edit_logs(self):
-        edit_log_filenames = [filename for filename in os.listdir(NAMENODE_METADATA_DIR) if filename.startswith(EDIT_LOG_PREFIX)]
-        for filename in edit_log_filenames:
-            os.remove(f'{NAMENODE_METADATA_DIR}/{filename}')
-
     def take_snapshot(self):
+        self.elm.process_edit_logs()
+
         inodes = []
         directories = []
         for inode in self.im.id_to_inode.values():
@@ -201,9 +180,12 @@ class EDFSNameNode:
         with open(f'{NAMENODE_METADATA_DIR}/{FSIMAGE_FILENAME}', 'w') as f:
             json.dump(fsimage, f, indent=2)
 
-        self.remove_edit_logs()
+        self.elm.remove_edit_logs()
 
-
+    async def register_datanode(self, writer, datanodeinfo):
+        print(datanodeinfo)
+        response = {"success": True, "msg": ""}
+        writer.write(json.dumps(response).encode())
 
 async def main():
     namenode = EDFSNameNode()

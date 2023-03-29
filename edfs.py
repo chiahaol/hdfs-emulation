@@ -3,6 +3,7 @@
 
 import asyncio
 import json
+import os
 import sys
 
 from config import *
@@ -43,6 +44,10 @@ async def main():
             exit(-1)
         local_path = sys.argv[2]
         remote_path = sys.argv[3] if len(sys.argv) > 3 else DEFAULT_BASE_DIR
+        local_path = local_path.rstrip("/")
+        if not os.path.exists(local_path):
+            print(f'put: {local_path}: No such file or directory')
+            exit(-1)
         await edfs_client.put(local_path, remote_path)
     elif command == CLI_GET:
         await edfs_client.get()
