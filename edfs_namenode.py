@@ -1,32 +1,36 @@
 import asyncio
 import json
 import os
+import random
 
 from block_manager import BlockManager
 from config import *
+from datanode_info import DataNodeInfo, DataNodeManager
 from editlog_manager import EditLogManager
 from inode_manager import InodeManager
 
 
 class EDFSNameNode:
     def __init__(self):
-        self.im = InodeManager(self.read_fsimage())
-        self.bm = BlockManager(self.im)
-        self.elm = EditLogManager(self.im)
+        fsimage = self.read_fsimage()
+        self.im = InodeManager(fsimage)
+        self.dnm = DataNodeManager()
+        self.bm = BlockManager(fsimage)
+        self.elm = EditLogManager(self.im, self.bm)
         self.take_snapshot()
 
     async def handle_client(self, reader, writer):
         data = await reader.read(BUF_LEN)
-        message = json.loads(data.decode())
-        command = message.get("cmd")
+        request = json.loads(data.decode())
+        command = request.get("cmd")
         if command == CMD_LS:
-            await self.ls(writer, message.get("path"))
+            await self.ls(writer, request.get("path"))
         elif command == CMD_MKDIR:
-            await self.mkdir(writer, message.get("path"))
+            await self.mkdir(writer, request.get("path"))
         elif command == CMD_RMDIR:
-            await self.rmdir(writer, message.get("path"))
+            await self.rmdir(writer, request.get("path"))
         elif command == CMD_CREATE:
-            await self.create(writer, message.get("path"))
+            await self.create(reader, writer, request)
         elif command == CMD_RM:
             pass
         elif command == CMD_CAT:
@@ -36,9 +40,11 @@ class EDFSNameNode:
         elif command == CMD_GET:
             pass
         elif command == CMD_TREE:
-            await self.tree(writer, message["path"])
+            await self.tree(writer,request.get("path"))
         elif command == DN_CMD_REGISTER:
-            await self.register_datanode(writer, message)
+            await self.register_datanode(writer, request)
+        elif command == CMD_ADD_BLOCK:
+            await self.add_block(writer, request)
 
         writer.close()
 
@@ -96,19 +102,27 @@ class EDFSNameNode:
         writer.write(json.dumps(response).encode())
         await writer.drain()
 
-    async def create(self, writer, path):
+    async def create(self, reader, writer, request):
+        path = request.get("path")
         base_dir_inode, filename = self.im.get_baseinode_and_filename(path)
         if base_dir_inode is None:
             response = {"success": False, "error": ERR_FILE_NOT_FOUND}
         elif filename == "" or base_dir_inode.get_child_inode_by_name(filename) != None:
             response = {"success": False, "error": ERR_FILE_EXIST}
         else:
-            new_dir_inode = self.im.create_file(base_dir_inode, filename)
-            log = {"edit_type": EDIT_TYPE_CREATE, "parent": base_dir_inode.get_id(), "name": new_dir_inode.get_name()}
+            new_file_inode = self.im.create_file(base_dir_inode, filename)
+            log = {"edit_type": EDIT_TYPE_CREATE, "parent": base_dir_inode.get_id(), "name": new_file_inode.get_name()}
             self.elm.write_log(log)
-            response = {"success": True}
+            response = {"success": True, "inode_id": new_file_inode.get_id()}
 
         writer.write(json.dumps(response).encode())
+        await writer.drain()
+
+        data = await reader.read(BUF_LEN)
+        request = json.loads(data.decode())
+        if request.get("cmd") == CMD_CREATE_DONE:
+            print(f'DBG: Finish creating {path}')
+
         return
 
     async def tree(self, writer, path):
@@ -153,15 +167,20 @@ class EDFSNameNode:
 
         inodes = []
         directories = []
-        for inode in self.im.id_to_inode.values():
+        for inode in self.im.get_all_inodes():
             if inode.is_file():
+                blocks = []
+                for block_id in inode.get_blocks():
+                    blk = self.bm.get_block_by_id(block_id)
+                    blocks.append({"id":  blk.get_id(), "numBytes": blk.get_num_bytes()})
+
                 inodes.append({
                     "id": inode.get_id(),
                     "type": inode.get_type(),
                     "name":  inode.get_name(),
                     "replication": inode.get_replication(),
                     "preferredBlockSize": inode.get_preferredBlockSize(),
-                    "blocks": inode.get_blocks()
+                    "blocks": blocks
                 })
             else:
                 inodes.append({
@@ -182,10 +201,45 @@ class EDFSNameNode:
 
         self.elm.remove_edit_logs()
 
-    async def register_datanode(self, writer, datanodeinfo):
-        print(datanodeinfo)
-        response = {"success": True, "msg": ""}
+    async def register_datanode(self, writer, request):
+        datanode_info = DataNodeInfo(request.get("ip"), request.get("port"), request.get("name"))
+        self.dnm.register(datanode_info)
+        blocks = request.get("blocks")
+        for block_id in blocks:
+            self.bm.add_block_loc(block_id, datanode_info.get_id())
+        response = {
+            "success": True,
+            "msg": f'Datanode {datanode_info.get_id()} ({datanode_info.get_name()}): {datanode_info.get_ip()}:{datanode_info.get_port()}'
+        }
         writer.write(json.dumps(response).encode())
+        await writer.drain()
+
+    async def add_block(self, writer, request):
+        inode_id = request.get("inode_id")
+        blk = self.bm.allocate_block_for(inode_id)
+        self.im.add_block_to(inode_id, blk.get_id())
+        blk_locs = self.select_block_locs(REPLICATION_FACTOR)
+        blk_locs_info = [
+            {
+                "ip": datanode_info.get_ip(),
+                "port": datanode_info.get_port(),
+                "name": datanode_info.get_name()
+            }
+            for datanode_info in blk_locs
+        ]
+        log = {"edit_type": EDIT_TYPE_ADD_BLOCK, "inode_id": inode_id, "block_id": blk.get_id()}
+        self.elm.write_log(log)
+        response = {"success": True, "inode_id": inode_id, "block_id": blk.get_id(), "blk_locs_info": blk_locs_info}
+
+        writer.write(json.dumps(response).encode())
+        await writer.drain()
+        return
+
+    # TODO: for simplicity, we randomly choose from all datanodes
+    def select_block_locs(self, num):
+        datanodes = self.dnm.get_all_datanodes()
+        return random.sample(datanodes, num)
+
 
 async def main():
     namenode = EDFSNameNode()

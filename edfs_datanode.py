@@ -5,15 +5,12 @@ import os
 from block_manager import BlockManager
 from config import *
 from dfs_packet import DFSPacket
-
+from utils import PacketUtils
 
 class EDFSDataNode:
     @classmethod
     async def create_instance(cls, ip, port, name):
         self = EDFSDataNode(ip, port, name)
-        self.namenode_reader, self.namenode_writer = await asyncio.open_connection(
-            LOCAL_HOST, NAMENODE_PORT
-        )
         if not os.path.exists(DATANODE_DATA_DIR):
             os.makedirs(DATANODE_DATA_DIR)
 
@@ -27,6 +24,9 @@ class EDFSDataNode:
         self.name = name
 
     async def register(self):
+        reader, writer = await asyncio.open_connection(
+            LOCAL_HOST, NAMENODE_PORT
+        )
         message = json.dumps({
             "cmd": DN_CMD_REGISTER,
             "ip": self.ip,
@@ -34,56 +34,114 @@ class EDFSDataNode:
             "name": self.name,
             "blocks": self.get_all_block_ids()
         })
-        self.namenode_writer.write(message.encode())
-        await self.namenode_writer.drain()
-
-        data = await self.namenode_reader.read(BUF_LEN)
+        writer.write(message.encode())
+        await writer.drain()
+        data = await reader.read(BUF_LEN)
         response = json.loads(data.decode())
         success = response.get("success")
         if success:
-            print(f'Datanode {self.name} successfully registered')
-        else:
-            print(response.get("msg"))
+            print(f'DBG: successfully registered and sent the block report to the namenode')
 
     async def serve(self):
-        print(f'Datanode {self.name} start serving ...')
+        print(f'DBG: Datanode {self.name} starts serving at {self.ip}:{self.port}')
 
         server = await asyncio.start_server(
-        self.handle_client, LOCAL_HOST, DATANODE_A_PORT)
+        self.handle_client, self.ip, self.port)
 
         async with server:
             await server.serve_forever()
 
     async def handle_client(self, reader, writer):
         data = await reader.read(BUF_LEN)
-        message = json.loads(data.decode())
-        command = message.get("cmd")
+        request = json.loads(data.decode())
+        command = request.get("cmd")
         if command == CLI_DATANODE_CMD_SETUP_WRITE:
-            await self.setup_write(reader, writer)
-            await self.recv_blocks(reader, writer)
+            block_id, nextnode_reader, nextnode_writer = await self.setup_write_pipeline(reader, writer, request)
+            end_of_pipeline = nextnode_writer is None
+            tasks = asyncio.gather(
+                self.recv_and_write(reader, writer, nextnode_reader, nextnode_writer, block_id, end_of_pipeline),
+                self.recv_acks(writer, nextnode_reader, end_of_pipeline)
+            )
+            await tasks
 
         writer.close()
 
-    async def setup_write(self, reader, writer):
+    async def setup_write_pipeline(self, reader, writer, request):
+        block_id = request.get("block_id")
+        next_datanodes = request.get("next_datanodes")
+        nextnode_reader, nextnode_writer = None, None
+        if next_datanodes:
+            target = next_datanodes.pop(0)
+            nextnode_reader, nextnode_writer = await asyncio.open_connection(
+                target.get("id"), target.get("port")
+            )
+            message = json.dumps({"cmd": CLI_DATANODE_CMD_SETUP_WRITE, "block_id": block_id, "next_datanodes": next_datanodes})
+            nextnode_writer.write(message.encode())
+            await nextnode_writer.drain()
+
+            nextnode_data = await nextnode_reader.read(BUF_LEN)
+            nextnode_response = json.loads(nextnode_data.decode())
+
         response = {"success": True}
         writer.write(json.dumps(response).encode())
         await writer.drain()
-        print(f'DBG: client requested to setup write ')
+        print(f'DBG: successfully setup the write pipeline, waiting for packets')
+        return block_id, nextnode_reader, nextnode_writer
 
-    async def recv_blocks(self, reader, writer):
+    async def recv_and_write(self, prevnode_reader, prevnode_writer, nextnode_reader, nextnode_writer, block_id, end_of_pipeline):
         buf = bytearray([])
+        block_data = []
         while True:
-            data = await reader.read(BUF_LEN)
+            data = await prevnode_reader.read(BUF_LEN)
             if not data:
-                packet = DFSPacket.decode(buf[:PACKET_BUF_SIZE])
-                print(f'{bytes(packet.get_data()).decode()}')
                 break
 
+            if not end_of_pipeline:
+                nextnode_writer.write(data)
+                await nextnode_writer.drain()
+
             buf += data
-            while len(buf) > PACKET_BUF_SIZE:
-                packet = DFSPacket.decode(buf[:PACKET_BUF_SIZE])
-                buf = buf[PACKET_BUF_SIZE:]
-                print(f'{bytes(packet.get_data()).decode()}')
+
+            packets, ptr = PacketUtils.create_packets_from_buffer(buf)
+            decoded_packets = [json.loads(packet.decode()) for packet in packets]
+            for decoded_packet in decoded_packets:
+                block_data.append(decoded_packet.get("data"))
+            if end_of_pipeline:
+                seqnos = [packet.get("seqno") for packet in decoded_packets]
+                await self.send_acks(prevnode_writer, seqnos)
+            buf = buf[ptr:]
+
+        if nextnode_writer:
+            nextnode_writer.close()
+
+        with open(f'{DATANODE_DATA_DIR}/{self.name}/{BlockManager.get_filename_from_block_id(block_id)}', 'w') as f:
+            f.write("".join(block_data))
+
+    async def recv_acks(self, prevnode_writer, nextnode_reader, end_of_pipeline):
+        if end_of_pipeline: return
+
+        buf = bytearray([])
+        while True:
+            data = await nextnode_reader.read(BUF_LEN)
+            if not data:
+                break
+            buf += data
+
+            packets, ptr = PacketUtils.create_packets_from_buffer(buf)
+            decoded_packets = [json.loads(packet.decode()) for packet in packets]
+            seqnos = [packet.get("seqno") for packet in decoded_packets]
+            await self.send_acks(prevnode_writer, seqnos)
+            buf = buf[ptr:]
+
+    async def send_acks(self, prevnode_writer, seqnos):
+        for seqno in seqnos:
+            ack = {
+                "type": "ack",
+                "seqno": seqno
+            }
+            prevnode_writer.write(PacketUtils.encode(json.dumps(ack).encode()))
+            await prevnode_writer.drain()
+
 
     def get_all_block_ids(self):
         return [BlockManager.get_file_block_id(filename) for filename in os.listdir(f'{DATANODE_DATA_DIR}/{self.name}') if filename.startswith(BLOCK_PREFIX)]

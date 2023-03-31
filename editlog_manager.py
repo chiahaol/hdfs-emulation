@@ -1,12 +1,14 @@
 import json
 import os
 
+from block import Block
 from config import *
 
 class EditLogManager:
-    def __init__(self, inode_manager):
+    def __init__(self, inode_manager, block_manager):
         self.last_edit_log_id = 0
         self.im = inode_manager
+        self.bm = block_manager
 
     def write_log(self, log):
         with open(self.get_next_edit_log_filename(), 'w') as output:
@@ -26,6 +28,8 @@ class EditLogManager:
                 self.process_rmdir_editlog(log)
             elif edit_type == EDIT_TYPE_CREATE:
                 self.process_create_editlog(log)
+            elif edit_type == EDIT_TYPE_ADD_BLOCK:
+                self.process_add_block_editlog(log)
 
     def process_mkdir_editlog(self, log):
         parent_id,  name = log.get("parent"), log.get("name")
@@ -42,6 +46,12 @@ class EditLogManager:
         parent_id, name = log.get("parent"), log.get("name")
         parent_inode = self.im.id_to_inode[parent_id]
         self.im.create_file(parent_inode, name)
+
+    def process_add_block_editlog(self, log):
+        inode_id, block_id = log.get("inode_id"), log.get("block_id")
+        blk = Block(block_id, inode_id)
+        self.bm.register_block(blk)
+        self.im.add_block_to(inode_id, block_id)
 
     def get_next_edit_log_filename(self):
         self.last_edit_log_id += 1

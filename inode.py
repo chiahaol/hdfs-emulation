@@ -40,6 +40,9 @@ class Inode:
     def add_dirent(self, inode, name):
         self.get_dirents().append(DirEnt(inode, name))
 
+    def add_block(self, block_id):
+        self.blocks.append(block_id)
+
     def get_parent_inode(self):
         for dirent in self.get_dirents():
             if dirent.name == "..":

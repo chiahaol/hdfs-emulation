@@ -17,7 +17,8 @@ class InodeManager():
             if inode["type"] == DIR_TYPE:
                 node = Inode(inode["id"], inode["type"], inode["name"])
             else:
-                node = Inode(inode["id"], inode["type"], inode["name"], inode["replication"], inode["preferredBlockSize"], inode.get("blocks"))
+                blocks = [blk.get("id") for blk in inode.get("blocks")]
+                node = Inode(inode["id"], inode["type"], inode["name"], inode["replication"], inode["preferredBlockSize"], blocks)
             self.id_to_inode[node.get_id()] = node
             if node.get_name() == ROOT_DIR_NAME:
                 self.root_inode = node
@@ -34,6 +35,9 @@ class InodeManager():
                 c_node.add_dirent(p_node, "..")
 
         self.root_inode.add_dirent(self.root_inode, "..")
+
+    def get_inode_by_id(self, id):
+        return self.id_to_inode.get(id)
 
     def get_inode_from_path(self, path):
         path = path.strip(' /')
@@ -52,6 +56,12 @@ class InodeManager():
             if cur_inode is None:
                 break
         return cur_inode
+
+    def get_all_inodes(self):
+        return list(self.id_to_inode.values())
+
+    def get_all_inode_ids(self):
+        return list(self.id_to_inode.keys())
 
     def get_baseinode_and_filename(self, path):
         path = path.strip(' /')
@@ -84,6 +94,10 @@ class InodeManager():
         self.id_to_inode[new_dir_inode.get_id()] = new_dir_inode
         self.last_inode_id += 1
         return new_dir_inode
+
+    def add_block_to(self, inode_id, block_id):
+        inode = self.get_inode_by_id(inode_id)
+        inode.add_block(block_id)
 
     def print_entries(self, dir_inode):
         dir_path = dir_inode.get_path()

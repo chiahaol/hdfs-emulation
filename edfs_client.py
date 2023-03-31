@@ -5,6 +5,7 @@ import sys
 
 from config import *
 from distributed_file_system import DistributedFileSystem
+from fs_data_output_stream import FSDataOutputStream
 
 
 class EDFSClient:
@@ -93,10 +94,13 @@ class EDFSClient:
     # TODO: currently only support file types
     # Should implement recursive put all files in a directory in the future
     async def put(self, local_path, remote_dir):
-        out_stream = await self.dfs.create(f'{remote_dir}/{os.path.basename(local_path)}')
-        if not out_stream:
+        inode_id = await self.dfs.create(f'{remote_dir}/{os.path.basename(local_path)}')
+        if not inode_id:
             return
-        await out_stream.write_file(local_path)
+        out_stream = await FSDataOutputStream.create()
+        await out_stream.write_file(local_path, inode_id)
+        await out_stream.wait_for_streamer()
+        await self.dfs.create_done(f'{remote_dir}/{os.path.basename(local_path)}')
         await out_stream.close()
 
     async def get(self):

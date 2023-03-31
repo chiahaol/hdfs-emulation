@@ -25,12 +25,13 @@ class FSDataOutputStream:
     async def wait_for_streamer(self):
         await self.get_streamer().finish()
 
-    async def write_file(self, filepath):
+    async def write_file(self, src, des_inode_id):
         self.task = asyncio.create_task(self.streamer.run())
+        self.get_streamer().setup(self.task, des_inode_id)
         block_capacity = DEFAULT_BLOCK_SZIE
-        with open(filepath, 'r') as f:
+        with open(src, 'r') as f:
             while True:
-                data = f.read(min(DEFAULT_PACKET_DATA_SIZE, block_capacity)).encode()
+                data = f.read(min(DEFAULT_PACKET_DATA_SIZE, block_capacity))
                 if len(data) == 0: break
                 block_capacity -= len(data)
                 if block_capacity == 0:
@@ -41,7 +42,4 @@ class FSDataOutputStream:
                 await self.enqueue_packet(packet)
 
     async def close(self):
-        await self.wait_for_streamer()
-        if self.task != None:
-            self.task.cancel()
         self.streamer.close()
