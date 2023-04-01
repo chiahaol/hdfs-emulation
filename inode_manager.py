@@ -2,7 +2,8 @@ from config import *
 from inode import Inode
 
 class InodeManager():
-    def __init__(self, fsimage):
+    def __init__(self, fsimage, block_manager):
+        self.bm = block_manager
         self.last_inode_id = INODE_ID_START
         self.last_block_id = BLOCK_ID_START
         self.id_to_inode = {}
@@ -102,6 +103,24 @@ class InodeManager():
                 parent.get_dirents().pop(i)
                 break
         del self.id_to_inode[inode.get_id()]
+
+        block_ids = inode.get_blocks()
+        for block_id in block_ids:
+            self.bm.delete_block(block_id)
+
+    def move(self, src_inode, des_inode, name):
+        parent = src_inode.get_parent_inode()
+        for i, dirent in enumerate(parent.get_dirents()):
+            if dirent.name == src_inode.get_name():
+                parent.get_dirents().pop(i)
+                break
+
+        for dirent in src_inode.get_dirents():
+            if dirent.name == "..":
+                dirent.inode = des_inode
+                break
+        src_inode.set_name(name)
+        des_inode.add_dirent(src_inode, name)
 
     def add_block_to(self, inode_id, block_id):
         inode = self.get_inode_by_id(inode_id)

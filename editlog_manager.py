@@ -32,6 +32,8 @@ class EditLogManager:
                 self.process_add_block_editlog(log)
             elif edit_type == EDIT_TYPE_RM:
                 self.process_rm_editlog(log)
+            elif edit_type == EDIT_TYPE_MV:
+                self.process_mv_editlog(log)
 
     def process_mkdir_editlog(self, log):
         parent_id,  name = log.get("parent"), log.get("name")
@@ -57,11 +59,13 @@ class EditLogManager:
 
     def process_rm_editlog(self, log):
         inode_id = log.get("inode_id")
-        inode = self.im.id_to_inode[inode_id]
+        inode = self.im.get_inode_by_id(inode_id)
         self.im.rm(inode)
-        block_ids = inode.get_blocks()
-        for block_id in block_ids:
-            self.bm.delete_block(block_id)
+
+    def process_mv_editlog(self, log):
+        src_inode_id, des_inode_id, name = log.get("src_inode_id"), log.get("des_inode_id"), log.get("name")
+        src_inode, des_inode = self.im.get_inode_by_id(src_inode_id), self.im.get_inode_by_id(des_inode_id)
+        self.im.move(src_inode, des_inode, name)
 
     def get_next_edit_log_filename(self):
         self.last_edit_log_id += 1

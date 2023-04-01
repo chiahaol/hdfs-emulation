@@ -37,6 +37,9 @@ class Inode:
     def get_dirents(self):
         return self.dir_entries
 
+    def set_name(self, name):
+        self.name = name
+
     def add_dirent(self, inode, name):
         self.get_dirents().append(DirEnt(inode, name))
 

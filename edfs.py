@@ -60,6 +60,11 @@ async def main():
         remote_path = sys.argv[2]
         local_path = sys.argv[3] if len(sys.argv) > 3 else f'./{os.path.basename(remote_path.lstrip("/"))}'
         await edfs_client.get(remote_path, local_path)
+    elif command == CLI_MV:
+        if len(sys.argv) < 4:
+            print(f'-mv: Not enough arguments: expected 2 but got {len(sys.argv) - 2}')
+            exit(-1)
+        await edfs_client.mv(sys.argv[2], sys.argv[3])
     elif command == CLI_TREE:
         path = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_BASE_DIR
         await edfs_client.tree(path)

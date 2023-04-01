@@ -13,9 +13,9 @@ from inode_manager import InodeManager
 class EDFSNameNode:
     def __init__(self):
         fsimage = self.read_fsimage()
-        self.im = InodeManager(fsimage)
-        self.dnm = DataNodeManager()
         self.bm = BlockManager(fsimage)
+        self.im = InodeManager(fsimage, self.bm)
+        self.dnm = DataNodeManager()
         self.elm = EditLogManager(self.im, self.bm)
         self.take_snapshot()
 
@@ -32,13 +32,9 @@ class EDFSNameNode:
         elif command == CMD_CREATE:
             await self.create(reader, writer, request)
         elif command == CMD_RM:
-            await self.rm(writer, request)
-        elif command == CMD_CAT:
-            pass
-        elif command == CMD_PUT:
-            pass
-        elif command == CMD_GET:
-            pass
+            await self.rm(request)
+        elif command == CMD_MV:
+            await self.mv(request)
         elif command == CMD_TREE:
             await self.tree(writer,request.get("path"))
         elif command == DN_CMD_REGISTER:
@@ -53,6 +49,8 @@ class EDFSNameNode:
             await self.exists(writer, request)
         elif command == CMD_IS_DIR:
             await self.is_dir(writer, request)
+        elif command == CMD_IS_IDENTICAL:
+            await self.is_identical(writer, request)
 
         writer.close()
 
@@ -132,19 +130,27 @@ class EDFSNameNode:
         path = request.get("path")
         print(f'DBG: Finish creating {path}')
 
-    async def rm(self, writer, request):
+    async def rm(self, request):
         path = request.get("path")
         inode = self.im.get_inode_from_path(path)
         self.im.rm(inode)
-        block_ids = inode.get_blocks()
-        for block_id in block_ids:
-            self.bm.delete_block(block_id)
 
         log = {"edit_type": EDIT_TYPE_RM, "inode_id": inode.get_id()}
         self.elm.write_log(log)
 
         print(f'DBG: {inode.get_path()} is successfully removed')
 
+    async def mv(self, request):
+        src, des = request.get("src"), request.get("des")
+        src_inode = self.im.get_inode_from_path(src)
+        des_dir_inode, filename = self.im.get_baseinode_and_filename(des)
+
+        self.im.move(src_inode, des_dir_inode, filename)
+
+        log = {"edit_type": EDIT_TYPE_MV, "src_inode_id": src_inode.get_id(), "des_inode_id": des_dir_inode.get_id(), "name": filename}
+        self.elm.write_log(log)
+
+        print(f'DBG: {src} is successfully moved to {des}')
 
     async def exists(self, writer, request):
         path = request.get("path")
@@ -164,6 +170,19 @@ class EDFSNameNode:
             response = {"is_dir": False}
         else:
             response = {"is_dir": True}
+
+        writer.write(json.dumps(response).encode())
+        await writer.drain()
+
+    async def is_identical(self, writer, request):
+        path1, path2 = request.get("path1"), request.get("path2")
+        inode1 = self.im.get_inode_from_path(path1)
+        inode2 = self.im.get_inode_from_path(path2)
+
+        if inode1 is None or inode2 is None or inode1.get_id() != inode2.get_id():
+            response = {"is_identical": False}
+        else:
+            response = {"is_identical": True}
 
         writer.write(json.dumps(response).encode())
         await writer.drain()

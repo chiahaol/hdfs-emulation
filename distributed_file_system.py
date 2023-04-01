@@ -67,8 +67,18 @@ class DistributedFileSystem:
             LOCAL_HOST, NAMENODE_PORT
         )
 
-        message = json.dumps({"cmd": CMD_RM, "path": path})
-        writer.write(message.encode())
+        request = json.dumps({"cmd": CMD_RM, "path": path})
+        writer.write(request.encode())
+        await writer.drain()
+
+        writer.close()
+
+    async def mv(self, src, des):
+        reader, writer = await asyncio.open_connection(
+            LOCAL_HOST, NAMENODE_PORT
+        )
+        request = json.dumps({"cmd": CMD_MV, "src": src, "des": des})
+        writer.write(request.encode())
         await writer.drain()
 
         writer.close()
@@ -85,6 +95,8 @@ class DistributedFileSystem:
         data = await reader.read(BUF_LEN)
         response = json.loads(data.decode())
         exists = response.get("exists")
+
+        writer.close()
         return exists
 
     async def is_dir(self, path):
@@ -98,5 +110,22 @@ class DistributedFileSystem:
 
         data = await reader.read(BUF_LEN)
         response = json.loads(data.decode())
-        exists = response.get("is_dir")
-        return exists
+        is_dir = response.get("is_dir")
+
+        writer.close()
+        return is_dir
+
+    async def is_identical(self, path1, path2):
+        reader, writer = await asyncio.open_connection(
+            LOCAL_HOST, NAMENODE_PORT
+        )
+
+        message = json.dumps({"cmd": CMD_IS_IDENTICAL, "path1": path1, "path2": path2})
+        writer.write(message.encode())
+        await writer.drain()
+
+        data = await reader.read(BUF_LEN)
+        response = json.loads(data.decode())
+
+        writer.close()
+        return response.get("is_identical")

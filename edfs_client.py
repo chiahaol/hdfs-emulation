@@ -107,7 +107,7 @@ class EDFSClient:
     # TODO: currently only support file types
     # Should implement recursive put all files in a directory in the future
     async def put(self, local_path, remote_path):
-        if os.path.basename(remote_path) == "":
+        if os.path.basename(remote_path) == "" or await self.dfs.is_dir(remote_path):
             target_path = f'{remote_path}{os.path.basename(local_path)}'
         else:
             target_path = remote_path
@@ -139,7 +139,7 @@ class EDFSClient:
         if os.path.exists(local_path):
             print(f'get: {local_path}: File exists')
             return
-        elif not await self.dfs.exists(remote_path):
+        if not await self.dfs.exists(remote_path):
             print(f'get: {remote_path}: No such file or directory')
             return
 
@@ -157,6 +157,35 @@ class EDFSClient:
 
         in_stream.close()
         self.dfs.close()
+
+    async def mv(self, src, des):
+        if not await self.dfs.exists(src):
+            print(f'mv: {src}: No such file or directory')
+            return
+
+        if not await self.dfs.exists(des):
+            dirname = os.path.dirname(des.rstrip("/"))
+            if not await self.dfs.exists(dirname) or not await self.dfs.is_dir(dirname):
+                print(f'mv: {dirname}: No such file or directory: edfs://localhost:9000{dirname}')
+                return
+            target = des
+        else:
+            if await self.dfs.is_dir(des):
+                target = f'{des}/{os.path.basename(src.rstrip("/"))}'
+                if await self.dfs.is_identical(src, target):
+                    print(f'mv: {src} to edfs://localhost:9000{target}: are identical')
+                    return
+                elif await self.dfs.exists(target):
+                    print(f'mv: {target}: File exists')
+                    return
+                elif await self.dfs.is_identical(src, des):
+                    print(f'mv: {src} to edfs://localhost:9000{des}: is a subdirectory of itself')
+                    return
+            else:
+                print(f'mv: {des}: File exists')
+                return
+
+        await self.dfs.mv(src, target)
 
     async def tree(self, path):
         message = json.dumps({"cmd": CMD_TREE, "path": path})

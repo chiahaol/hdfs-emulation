@@ -15,6 +15,7 @@ CLI_RM = "-rm"
 CLI_CAT = "-cat"
 CLI_PUT = "-put"
 CLI_GET = "-get"
+CLI_MV = "-mv"
 CLI_TREE = "-tree"
 
 # client to namenode commands
@@ -32,6 +33,8 @@ CMD_CREATE_COMPLETE = 110
 CMD_GET_BLOCK_LOCATIONS = 111
 CMD_FILE_EXISTS = 112
 CMD_IS_DIR = 113
+CMD_MV = 114
+CMD_IS_IDENTICAL = 115
 
 # client to datanode commands
 CLI_DATANODE_CMD_SETUP_WRITE = 200
@@ -47,6 +50,7 @@ EDIT_TYPE_RMDIR = 401
 EDIT_TYPE_CREATE = 402
 EDIT_TYPE_ADD_BLOCK = 403
 EDIT_TYPE_RM = 404
+EDIT_TYPE_MV = 405
 
 # Metadata
 NAMENODE_METADATA_DIR = "./tmp/name"
