@@ -30,6 +30,8 @@ class EditLogManager:
                 self.process_create_editlog(log)
             elif edit_type == EDIT_TYPE_ADD_BLOCK:
                 self.process_add_block_editlog(log)
+            elif edit_type == EDIT_TYPE_RM:
+                self.process_rm_editlog(log)
 
     def process_mkdir_editlog(self, log):
         parent_id,  name = log.get("parent"), log.get("name")
@@ -48,10 +50,18 @@ class EditLogManager:
         self.im.create_file(parent_inode, name)
 
     def process_add_block_editlog(self, log):
-        inode_id, block_id = log.get("inode_id"), log.get("block_id")
-        blk = Block(block_id, inode_id)
+        inode_id, block_id, num_bytes = log.get("inode_id"), log.get("block_id"), log.get("num_bytes")
+        blk = Block(block_id, inode_id, num_bytes, [])
         self.bm.register_block(blk)
         self.im.add_block_to(inode_id, block_id)
+
+    def process_rm_editlog(self, log):
+        inode_id = log.get("inode_id")
+        inode = self.im.id_to_inode[inode_id]
+        self.im.rm(inode)
+        block_ids = inode.get_blocks()
+        for block_id in block_ids:
+            self.bm.delete_block(block_id)
 
     def get_next_edit_log_filename(self):
         self.last_edit_log_id += 1

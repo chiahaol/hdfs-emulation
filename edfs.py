@@ -35,9 +35,16 @@ async def main():
     elif command == CLI_TOUCH:
         await edfs_client.touch()
     elif command == CLI_RM:
-        await edfs_client.rm()
+        if len(sys.argv) < 3:
+            print("-rm: Not enough arguments: expected 1 but got 0")
+            exit(-1)
+        await edfs_client.rm(sys.argv[2])
     elif command == CLI_CAT:
-        await edfs_client.cat()
+        if len(sys.argv) < 3:
+            print("-cat: Not enough arguments: expected 1 but got 0")
+            exit(-1)
+        path = sys.argv[2]
+        await edfs_client.cat(path)
     elif command == CLI_PUT:
         if len(sys.argv) < 3:
             print("-put: Not enough arguments: expected 1 but got 0")
@@ -45,12 +52,14 @@ async def main():
         local_path = sys.argv[2]
         remote_path = sys.argv[3] if len(sys.argv) > 3 else DEFAULT_BASE_DIR
         local_path = local_path.rstrip("/")
-        if not os.path.exists(local_path):
-            print(f'put: {local_path}: No such file or directory')
-            exit(-1)
         await edfs_client.put(local_path, remote_path)
     elif command == CLI_GET:
-        await edfs_client.get()
+        if len(sys.argv) < 3:
+            print("-get: Not enough arguments: expected 1 but got 0")
+            exit(-1)
+        remote_path = sys.argv[2]
+        local_path = sys.argv[3] if len(sys.argv) > 3 else f'./{os.path.basename(remote_path.lstrip("/"))}'
+        await edfs_client.get(remote_path, local_path)
     elif command == CLI_TREE:
         path = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_BASE_DIR
         await edfs_client.tree(path)

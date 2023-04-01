@@ -7,10 +7,6 @@ from dfs_packet import DFSPacket
 from utils import PacketUtils
 
 class DataStreamer:
-    @classmethod
-    async def create(cls):
-        self = DataStreamer()
-        return self
 
     def __init__(self):
         self.des_inode_id = None
@@ -31,24 +27,26 @@ class DataStreamer:
         block_id = None
         blk_locs_info = None
         ack_task = None
-        should_allocate_new_block = True
+        packets_buf = []
+        num_bytes = 0
         while True:
-            if should_allocate_new_block:
-                block_id, blk_locs_info = await self.request_new_block()
-                target = blk_locs_info.pop(0)
-                self.reader, self.writer = await self.setup_pipeline(block_id, target, blk_locs_info)
-                ack_task = asyncio.create_task(self.recv_acks(self.reader))
-                should_allocate_new_block = False
             packet = await self.data_queue.get()
-            await self.write_to_pipeline(self.writer, packet, block_id, blk_locs_info)
+            num_bytes += packet.get_datalen()
+            packets_buf.append(packet)
             await self.ack_queue.put(packet)
             self.data_queue.task_done()
             if packet.is_last_packet_in_block():
+                block_id, blk_locs_info = await self.request_new_block(num_bytes)
+                target = blk_locs_info.pop(0)
+                reader, writer = await self.setup_pipeline(block_id, target, blk_locs_info)
+                ack_task = asyncio.create_task(self.recv_acks(reader))
+                await self.writebock(writer, packets_buf, block_id, blk_locs_info)
+                print(f'DBG: block {block_id} was successfully sent to datanodes {target.get("name")} {" ".join([loc.get("name") for loc in blk_locs_info])}')
                 await self.wait_for_all_ack()
                 ack_task.cancel()
-                print(f'DBG: block {block_id} was successfully sent to datanodes {target.get("name")} {" ".join([loc.get("name") for loc in blk_locs_info])}')
-                should_allocate_new_block = True
-                self.writer.close()
+                writer.close()
+                packets_buf = []
+                num_bytes = 0
 
     async def recv_acks(self, nextnode_reader):
         buf = bytearray([])
@@ -67,22 +65,23 @@ class DataStreamer:
                 self.ack_queue.task_done()
             buf = buf[ptr:]
 
-    async def write_to_pipeline(self, writer, packet, block_id, next_datanodes):
-        buf = {
-            "seqno": packet.get_seqno(),
-            "data": packet.get_data(),
-            "is_last_packet_in_block": packet.is_last_packet_in_block(),
-            "block_id": block_id,
-            "next_datanodes": next_datanodes
-        }
-        writer.write(PacketUtils.encode(json.dumps(buf).encode()))
-        await writer.drain()
+    async def writebock(self, writer, packets_buf, block_id, next_datanodes):
+        for packet in packets_buf:
+            buf = {
+                "seqno": packet.get_seqno(),
+                "data": packet.get_data(),
+                "is_last_packet_in_block": packet.is_last_packet_in_block(),
+                "block_id": block_id,
+                "next_datanodes": next_datanodes
+            }
+            writer.write(PacketUtils.encode(json.dumps(buf).encode()))
+            await writer.drain()
 
-    async def request_new_block(self):
+    async def request_new_block(self, num_bytes):
         reader, writer = await asyncio.open_connection(
             LOCAL_HOST, NAMENODE_PORT
         )
-        message = json.dumps({"cmd": CMD_ADD_BLOCK, "inode_id": self.des_inode_id})
+        message = json.dumps({"cmd": CMD_ADD_BLOCK, "inode_id": self.des_inode_id, "num_bytes": num_bytes})
         writer.write(message.encode())
         await writer.drain()
 

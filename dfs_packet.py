@@ -12,6 +12,7 @@ class DFSPacket:
 
     def __init__(self, data, last_packet_in_block):
         self.data = data
+        self.num_byte = len(data)
         self.last_packet_in_block = last_packet_in_block
 
     def get_seqno(self):

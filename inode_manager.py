@@ -95,6 +95,14 @@ class InodeManager():
         self.last_inode_id += 1
         return new_dir_inode
 
+    def rm(self, inode):
+        parent = inode.get_parent_inode()
+        for i, dirent in enumerate(parent.get_dirents()):
+            if dirent.name == inode.name:
+                parent.get_dirents().pop(i)
+                break
+        del self.id_to_inode[inode.get_id()]
+
     def add_block_to(self, inode_id, block_id):
         inode = self.get_inode_by_id(inode_id)
         inode.add_block(block_id)

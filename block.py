@@ -2,7 +2,7 @@ from config import *
 
 
 class Block:
-    def __init__(self, block_id, inode_id, num_bytes = 0, locations=None):
+    def __init__(self, block_id, inode_id, num_bytes, locations=None):
         self.id = block_id
         self.inode_id = inode_id
         self.num_bytes = num_bytes

@@ -19,6 +19,9 @@ class DataNodeInfo:
     def get_name(self):
         return self.name
 
+    def get_info(self):
+        return {"ip": self.ip, "port": self.port, "name": self.name}
+
 class DataNodeManager:
     def __init__(self):
         self.id_to_datanode = {}

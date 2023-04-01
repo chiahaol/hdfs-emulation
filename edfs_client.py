@@ -15,11 +15,10 @@ class EDFSClient:
         self.namenode_reader, self.namenode_writer = await asyncio.open_connection(
             LOCAL_HOST, NAMENODE_PORT
         )
-        self.dfs = await DistributedFileSystem.create_instance()
         return self
 
     def __init__(self):
-        pass
+        self.dfs = DistributedFileSystem()
 
     def close(self):
         if self.namenode_writer:
@@ -75,41 +74,89 @@ class EDFSClient:
         data = await self.namenode_reader.read(100)
         print(f'{data.decode()!r}')
 
-    async def rm(self):
-        message = "rm"
-        self.namenode_writer.write(message.encode())
-        await self.namenode_writer.drain()
+    async def rm(self, path):
+        if not await self.dfs.exists(path):
+            print(f'rm: {path}: No such file or directory')
+            return
+        elif await self.dfs.is_dir(path):
+            print(f'rm: {path}: Is a directory')
+            return
+        await self.dfs.rm(path)
 
-        data = await self.namenode_reader.read(100)
-        print(f'{data.decode()!r}')
+    async def cat(self, path):
+        if not await self.dfs.exists(path):
+            print(f'cat: {path}: No such file or directory')
+            return
+        if await self.dfs.is_dir(path):
+            print(f'cat: {path}: Is a directory')
+            return
 
-    async def cat(self):
-        message = "cat"
-        self.namenode_writer.write(message.encode())
-        await self.namenode_writer.drain()
+        in_stream = await self.dfs.open(path)
+        if not in_stream:
+            return
+        buf = bytearray([])
+        while (await in_stream.read(buf)) > 0:
+            if len(buf) >= BUF_LEN:
+                print(buf.decode(), end="")
+                buf = []
+        print(buf.decode(), end="")
 
-        data = await self.namenode_reader.read(100)
-        print(f'{data.decode()!r}')
+        in_stream.close()
+        self.dfs.close()
 
     # TODO: currently only support file types
     # Should implement recursive put all files in a directory in the future
-    async def put(self, local_path, remote_dir):
-        inode_id = await self.dfs.create(f'{remote_dir}/{os.path.basename(local_path)}')
-        if not inode_id:
+    async def put(self, local_path, remote_path):
+        if os.path.basename(remote_path) == "":
+            target_path = f'{remote_path}{os.path.basename(local_path)}'
+        else:
+            target_path = remote_path
+
+        if not os.path.exists(local_path):
+            print(f'put: {local_path}: No such file or directory')
             return
-        out_stream = await FSDataOutputStream.create()
-        await out_stream.write_file(local_path, inode_id)
-        await out_stream.wait_for_streamer()
-        await self.dfs.create_done(f'{remote_dir}/{os.path.basename(local_path)}')
+        elif await self.dfs.exists(target_path):
+            print(f'put: {target_path}: File exists')
+            return
+        elif not await self.dfs.exists(os.path.dirname(remote_path)):
+            print(f'put: {os.path.dirname(remote_path)}: No such file or directory: hdfs://localhost:9000{os.path.dirname(remote_path)}')
+            return
+        elif not await self.dfs.is_dir(os.path.dirname(remote_path)):
+            print(f'put: {os.path.dirname(remote_path)} (is not a directory)')
+            return
+
+        out_stream = await self.dfs.create(target_path)
+        if not out_stream:
+            return
+        await out_stream.write(local_path)
+        await self.dfs.create_complete(target_path)
         await out_stream.close()
+        self.dfs.close()
 
-    async def get(self):
-        message = "get"
-        self.namenode_writer.write(message.encode())
-        await self.namenode_writer.drain()
+    # TODO: currently only support file types
+    # Should implement recursive get all files in a directory in the future
+    async def get(self, remote_path, local_path):
+        if os.path.exists(local_path):
+            print(f'get: {local_path}: File exists')
+            return
+        elif not await self.dfs.exists(remote_path):
+            print(f'get: {remote_path}: No such file or directory')
+            return
 
-        data = await self.namenode_reader.read(100)
-        print(f'{data.decode()!r}')
+        in_stream = await self.dfs.open(remote_path)
+        if not in_stream:
+            return
+
+        with open(local_path, 'a') as f:
+            buf = bytearray([])
+            while (await in_stream.read(buf)) > 0:
+                if len(buf) >= BUF_LEN:
+                    f.write(buf.decode())
+                    buf = []
+            f.write(buf.decode())
+
+        in_stream.close()
+        self.dfs.close()
 
     async def tree(self, path):
         message = json.dumps({"cmd": CMD_TREE, "path": path})

@@ -6,48 +6,97 @@ from fs_data_input_stream import FSDataInputStream
 from fs_data_output_stream import FSDataOutputStream
 
 class DistributedFileSystem:
-    @classmethod
-    async def create_instance(cls):
-        self = DistributedFileSystem()
-        return self
-
     def __init__(self):
-         self.namenode_reader = None
-         self.namenode_writer = None
+         pass
 
     def close(self):
-        if self.namenode_writer:
-            self.namenode_writer.close()
+        pass
 
-    def open(self, path):
-        return FSDataInputStream()
+    async def open(self, path):
+        reader, writer = await asyncio.open_connection(
+            LOCAL_HOST, NAMENODE_PORT
+        )
+        message = json.dumps({"cmd": CMD_GET_BLOCK_LOCATIONS, "path": path})
+        writer.write(message.encode())
+        await writer.drain()
+
+        data = await reader.read(BUF_LEN)
+        writer.close()
+
+        response = json.loads(data.decode())
+        success = response.get("success")
+        if success:
+            block_locations = response.get("block_locations")
+            return FSDataInputStream(block_locations)
+
+        return None
 
     async def create(self, path):
-        self.namenode_reader, self.namenode_writer = await asyncio.open_connection(
+        reader, writer = await asyncio.open_connection(
             LOCAL_HOST, NAMENODE_PORT
         )
 
         message = json.dumps({"cmd": CMD_CREATE, "path": path})
-        self.namenode_writer.write(message.encode())
-        await self.namenode_writer.drain()
+        writer.write(message.encode())
+        await writer.drain()
 
-        data = await self.namenode_reader.read(BUF_LEN)
+        data = await reader.read(BUF_LEN)
+        writer.close()
+
         response = json.loads(data.decode())
         success = response.get("success")
         if success:
             inode_id = response.get("inode_id")
-            return inode_id
-
-        # TODO: propagate error to client program
-        error = response.get("error")
-        if error == ERR_FILE_NOT_FOUND:
-            print(f'{path}: No such file or directory: hdfs://localhost:9000/{path}')
-        elif error == ERR_FILE_EXIST:
-            print(f'{path}: File exists')
+            return FSDataOutputStream(inode_id)
 
         return None
 
-    async def create_done(self, path):
-        message = json.dumps({"cmd": CMD_CREATE_DONE, "path": path})
-        self.namenode_writer.write(message.encode())
-        await self.namenode_writer.drain()
+    async def create_complete(self, path):
+        reader, writer = await asyncio.open_connection(
+            LOCAL_HOST, NAMENODE_PORT
+        )
+
+        message = json.dumps({"cmd": CMD_CREATE_COMPLETE, "path": path})
+        writer.write(message.encode())
+        await writer.drain()
+
+        writer.close()
+
+    async def rm(self, path):
+        reader, writer = await asyncio.open_connection(
+            LOCAL_HOST, NAMENODE_PORT
+        )
+
+        message = json.dumps({"cmd": CMD_RM, "path": path})
+        writer.write(message.encode())
+        await writer.drain()
+
+        writer.close()
+
+    async def exists(self, path):
+        reader, writer = await asyncio.open_connection(
+            LOCAL_HOST, NAMENODE_PORT
+        )
+
+        message = json.dumps({"cmd": CMD_FILE_EXISTS, "path": path})
+        writer.write(message.encode())
+        await writer.drain()
+
+        data = await reader.read(BUF_LEN)
+        response = json.loads(data.decode())
+        exists = response.get("exists")
+        return exists
+
+    async def is_dir(self, path):
+        reader, writer = await asyncio.open_connection(
+            LOCAL_HOST, NAMENODE_PORT
+        )
+
+        message = json.dumps({"cmd": CMD_IS_DIR, "path": path})
+        writer.write(message.encode())
+        await writer.drain()
+
+        data = await reader.read(BUF_LEN)
+        response = json.loads(data.decode())
+        exists = response.get("is_dir")
+        return exists
