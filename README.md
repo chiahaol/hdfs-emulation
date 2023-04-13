@@ -1,7 +1,7 @@
 # hdfs-emulation
 Emulating Hadoop Distributed File System (HDFS)
 
-## environment setup
+## Environment setup
 you could use either one of the methods below:
 ### 1. Pyhton virtual environment
 ```python3 -m venv ~/ds551```\
