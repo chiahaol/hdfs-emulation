@@ -1,9 +1,9 @@
 import asyncio
 
 from collections import deque
-from config import *
-from data_streamer import DataStreamer
-from dfs_packet import DFSPacket
+from edfs.config import *
+from edfs.data_streamer import DataStreamer
+from edfs.dfs_packet import DFSPacket
 
 class FSDataOutputStream:
     def __init__(self, des_inode_id):

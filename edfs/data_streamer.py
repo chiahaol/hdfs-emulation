@@ -1,10 +1,10 @@
 import asyncio
 import json
 
-from block import Block, LocatedBlock
-from config import *
-from dfs_packet import DFSPacket
-from utils import PacketUtils
+from edfs.block import Block, LocatedBlock
+from edfs.config import *
+from edfs.dfs_packet import DFSPacket
+from edfs.utils import PacketUtils
 
 class DataStreamer:
 

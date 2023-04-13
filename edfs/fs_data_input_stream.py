@@ -2,7 +2,7 @@ import asyncio
 import json
 import random
 
-from config import *
+from edfs.config import *
 
 class FSDataInputStream:
     def __init__(self, block_locations):

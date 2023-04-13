@@ -1,6 +1,6 @@
-from block import Block
-from config import *
 from collections import deque
+from edfs.block import Block
+from edfs.config import *
 
 
 class BlockManager:

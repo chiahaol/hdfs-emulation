@@ -1,4 +1,4 @@
-from config import *
+from edfs.config import *
 
 class Inode:
     def __init__(self, id, type, name, replication=0, preferredBlockSize=0, blocks=None):

@@ -1,4 +1,4 @@
-from config import *
+from edfs.config import *
 
 class DFSPacket:
     seqno = 0

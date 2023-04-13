@@ -3,11 +3,11 @@ import json
 import os
 import random
 
-from block_manager import BlockManager
-from config import *
-from datanode_info import DataNodeInfo, DataNodeManager
-from editlog_manager import EditLogManager
-from inode_manager import InodeManager
+from edfs.block_manager import BlockManager
+from edfs.config import *
+from edfs.datanode_info import DataNodeInfo, DataNodeManager
+from edfs.editlog_manager import EditLogManager
+from edfs.inode_manager import InodeManager
 
 
 class EDFSNameNode:
@@ -193,22 +193,16 @@ class EDFSNameNode:
             response = {"success": False, "msg": f'tree: {path}: No such file or directory'}
             writer.write(json.dumps(response).encode())
             return
-
-        dir_tree = []
-        self.tree_helper(inode, 0, dir_tree)
-        response = {"success": True, "output": "\n".join(dir_tree)}
+        response = {"success": True, "files": self.get_all_files(inode)}
         writer.write(json.dumps(response).encode())
         await writer.drain()
 
-    def tree_helper(self, inode, level, output):
-        if inode.is_file():
-            output.append(f'{"    " * level}{inode.get_name()}')
-            return
-
-        output.append(f'{"    " * level}{inode.get_name()}:')
+    def get_all_files(self, inode):
+        children = []
         for dirent in inode.get_dirents():
             if dirent.name != "." and dirent.name != "..":
-                self.tree_helper(dirent.inode, level + 1, output)
+                children.append(self.get_all_files(dirent.inode))
+        return {"name": inode.get_name(), "type": inode.get_type(), "children": children}
 
     def read_fsimage(self):
         if not os.path.exists(NAMENODE_METADATA_DIR):
@@ -216,7 +210,7 @@ class EDFSNameNode:
 
         if not os.path.exists(f'{NAMENODE_METADATA_DIR}/{FSIMAGE_FILENAME}'):
             with open(f'{NAMENODE_METADATA_DIR}/{FSIMAGE_FILENAME}', 'w') as f:
-                fsimage = {"inodes": [{"id": INODE_ID_START, "type": "DIRECTORY", "name": ""}], "directories": []}
+                fsimage = {"inodes": [{"id": INODE_ID_START, "type": "DIRECTORY", "name": ""}], "directories": [], "freeBlocks": []}
                 json.dump(fsimage, f)
         else:
             with open(f'{NAMENODE_METADATA_DIR}/{FSIMAGE_FILENAME}', 'r') as f:
@@ -324,15 +318,3 @@ class EDFSNameNode:
             response = {"success": True, "block_locations": block_locations}
         writer.write(json.dumps(response).encode())
         await writer.drain()
-
-async def main():
-    namenode = EDFSNameNode()
-    server = await asyncio.start_server(
-        namenode.handle_client, LOCAL_HOST, NAMENODE_PORT)
-
-    async with server:
-        await server.serve_forever()
-
-
-if __name__ == "__main__":
-    asyncio.run(main())

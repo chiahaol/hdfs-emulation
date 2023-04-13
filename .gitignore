@@ -1,3 +1,8 @@
+#edfs
+./tmp
+./fsimage.json
+./big.txt
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

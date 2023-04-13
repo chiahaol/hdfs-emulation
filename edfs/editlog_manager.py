@@ -1,8 +1,8 @@
 import json
 import os
 
-from block import Block
-from config import *
+from edfs.block import Block
+from edfs.config import *
 
 class EditLogManager:
     def __init__(self, inode_manager, block_manager):

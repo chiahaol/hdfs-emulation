@@ -3,9 +3,9 @@ import json
 import os
 import sys
 
-from config import *
-from distributed_file_system import DistributedFileSystem
-from fs_data_output_stream import FSDataOutputStream
+from edfs.config import *
+from edfs.distributed_file_system import DistributedFileSystem
+from edfs.fs_data_output_stream import FSDataOutputStream
 
 
 class EDFSClient:
@@ -108,7 +108,7 @@ class EDFSClient:
     # Should implement recursive put all files in a directory in the future
     async def put(self, local_path, remote_path):
         if os.path.basename(remote_path) == "" or await self.dfs.is_dir(remote_path):
-            target_path = f'{remote_path}{os.path.basename(local_path)}'
+            target_path = f'{remote_path}/{os.path.basename(local_path)}'
         else:
             target_path = remote_path
 
@@ -198,5 +198,29 @@ class EDFSClient:
         if not success:
             print(response.get("msg"))
         else:
-            dir_tree = response.get("output")
-            print(dir_tree)
+            root = response.get("files")
+            output = []
+            self.tree_helper(root, 0, output)
+            print("\n".join(output))
+
+    def tree_helper(self, file, level, output):
+        _name = file.get("name")
+        _type = file.get("type")
+
+        if _type == FILE_TYPE:
+            output.append(f'{"    " * level}{_name}')
+        else:
+            output.append(f'{"    " * level}{_name}:')
+            children = file.get("children")
+            for child in children:
+                self.tree_helper(child, level + 1, output)
+
+    async def get_all_files(self):
+        message = json.dumps({"cmd": CMD_TREE, "path": "/"})
+        self.namenode_writer.write(message.encode())
+        await self.namenode_writer.drain()
+
+        data = await self.namenode_reader.read(BUF_LEN)
+        response = json.loads(data.decode())
+        success = response.get("success")
+        return response.get("files")

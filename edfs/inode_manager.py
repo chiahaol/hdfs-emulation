@@ -1,5 +1,5 @@
-from config import *
-from inode import Inode
+from edfs.config import *
+from edfs.inode import Inode
 
 class InodeManager():
     def __init__(self, fsimage, block_manager):

@@ -1,9 +1,9 @@
 import asyncio
 import json
 
-from config import *
-from fs_data_input_stream import FSDataInputStream
-from fs_data_output_stream import FSDataOutputStream
+from edfs.config import *
+from edfs.fs_data_input_stream import FSDataInputStream
+from edfs.fs_data_output_stream import FSDataOutputStream
 
 class DistributedFileSystem:
     def __init__(self):

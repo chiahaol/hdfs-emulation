@@ -6,8 +6,8 @@ import json
 import os
 import sys
 
-from config import *
-from edfs_client import EDFSClient
+from edfs.config import *
+from edfs.edfs_client import EDFSClient
 
 async def main():
     if (len(sys.argv) < 2):

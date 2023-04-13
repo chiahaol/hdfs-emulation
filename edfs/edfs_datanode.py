@@ -2,10 +2,10 @@ import asyncio
 import json
 import os
 
-from block_manager import BlockManager
-from config import *
-from dfs_packet import DFSPacket
-from utils import PacketUtils
+from edfs.block_manager import BlockManager
+from edfs.config import *
+from edfs.dfs_packet import DFSPacket
+from edfs.utils import PacketUtils
 
 class EDFSDataNode:
     @classmethod
