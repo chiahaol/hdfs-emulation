@@ -29,8 +29,7 @@ example:
 ```python3 edfs.py -ls /```
 
 ## Web Interface
-After starting up the namenode and datanodes,
-go to the web directory
+After starting up the namenode and datanodes, go to the web directory\
 ```cd web```
 ### start up backend API
 ```python3 backend.py```\
