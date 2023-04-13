@@ -2,7 +2,7 @@
 Emulating Hadoop Distributed File System (HDFS)
 
 ## Before you start
-Go to the directory where you download this repo, and
+Go to the directory where you download this repo, and\
 ```cd hdfs-emulation```
 
 ## Environment setup
