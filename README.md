@@ -2,12 +2,12 @@
 Emulating Hadoop Distributed File System (HDFS)
 
 ## environment setup
-you could use either one of the methods below
-### Pyhton virtual environment
+you could use either one of the methods below:
+### 1. Pyhton virtual environment
 ```python3 -m venv ~/ds551```\
 ```source ~/ds551/bin/activate```\
 ```pip3 install -r requirements.txt```
-### manually install the packages in requirements.txt
+### 2. manually install the packages in requirements.txt
 
 ## Run
 First start up the namenodes and datanodes
@@ -16,8 +16,8 @@ First start up the namenodes and datanodes
 ```python3 namenode.py```
 
 ### datanodes
-```python3 datanode_A.py```
-```python3 datanode_B.py```
+```python3 datanode_A.py```\
+```python3 datanode_B.py```\
 ```python3 datanode_C.py```
 
 ### client CLI
