@@ -1,6 +1,10 @@
 # hdfs-emulation
 Emulating Hadoop Distributed File System (HDFS)
 
+## Before you start
+Go to the directory where you download this repo, and
+```cd hdfs-emulation```
+
 ## Environment setup
 you could use either one of the methods below:
 ### 1. Pyhton virtual environment
@@ -25,9 +29,9 @@ example:
 ```python3 edfs.py -ls /```
 
 ## Web Interface
-After starting up the namenode and datanodes
-
+After starting up the namenode and datanodes,
+go to the web directory
+```cd web```
 ### start up backend API
-```cd web```\
 ```python3 backend.py```\
 you can try http://127.0.0.1:8080/files on your browser to see if the backend works successfully
