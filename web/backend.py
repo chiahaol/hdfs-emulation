@@ -8,6 +8,10 @@ from edfs.edfs_client import EDFSClient
 
 app = Flask(__name__)
 
+@app.route('/')
+def root():
+    return app.send_static_file("index.html")
+
 @app.route("/files",  methods=["GET"])
 async def get_all_files():
     edfs_client = await EDFSClient.create()
