@@ -35,4 +35,4 @@ After starting up the namenode and datanodes, go to the web directory\
 ```python3 backend.py```\
 
 ### access webpage
-[127.0.0.1:8080](127.0.0.1:8080)
+[http://127.0.0.1:8080](http://127.0.0.1:8080)
