@@ -33,4 +33,6 @@ After starting up the namenode and datanodes, go to the web directory\
 ```cd web```
 ### start up backend API
 ```python3 backend.py```\
-you can try http://127.0.0.1:8080/files on your browser to see if the backend works successfully
+
+### access webpage
+```https:127.0.0.1:8080
