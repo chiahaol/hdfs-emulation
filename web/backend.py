@@ -18,11 +18,11 @@ async def get_all_files():
     files = await edfs_client.get_all_files()
     return files
 
-@app.route("/download/<path:file>",  methods=["GET"])
-async def download(file):
-    print(file)
+@app.route("/file/<path:filepath>",  methods=["GET"])
+async def get_file(filepath):
+    print(filepath)
     edfs_client = await EDFSClient.create()
-    data = await edfs_client.get_file(file)
+    data = await edfs_client.get_file(filepath)
     if not data.get("success"):
          response = make_response("", 404)
     else:
