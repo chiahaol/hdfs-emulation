@@ -66,6 +66,7 @@ class EDFSClient:
         if not success:
             print(response.get("msg"))
 
+    # TODO: implement this
     async def touch(self):
         message = "touch"
         self.namenode_writer.write(message.encode())
@@ -157,6 +158,25 @@ class EDFSClient:
 
         in_stream.close()
         self.dfs.close()
+
+    async def get_file(self, path):
+        if not await self.dfs.exists(path):
+            return {"success": False}
+        if await self.dfs.is_dir(path):
+            return {"success": False}
+
+        in_stream = await self.dfs.open(path)
+        if not in_stream:
+            return {"success": False}
+
+        buf = bytearray([])
+        while (await in_stream.read(buf)) > 0:
+            continue
+
+        in_stream.close()
+        self.dfs.close()
+
+        return {"success": True, "file": buf.decode()}
 
     async def mv(self, src, des):
         if not await self.dfs.exists(src):

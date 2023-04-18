@@ -3,7 +3,7 @@ import sys
 
 sys.path.append("..")
 
-from flask import Flask
+from flask import Flask, request, make_response
 from edfs.edfs_client import EDFSClient
 
 app = Flask(__name__)
@@ -18,10 +18,18 @@ async def get_all_files():
     files = await edfs_client.get_all_files()
     return files
 
-@app.route("/download",  methods=["GET"])
-def download():
-    print("download")
-    return {"success": True}
+@app.route("/download/<path:file>",  methods=["GET"])
+async def download(file):
+    print(file)
+    edfs_client = await EDFSClient.create()
+    data = await edfs_client.get_file(file)
+    if not data.get("success"):
+         response = make_response("", 404)
+    else:
+        content = data.get("file")
+        response = make_response(content, 200)
+        response.mimetype = "text/plain"
+    return response
 
 @app.route("/upload",  methods=["GET"])
 def upload():
