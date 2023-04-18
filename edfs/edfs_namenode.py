@@ -202,7 +202,7 @@ class EDFSNameNode:
         for dirent in inode.get_dirents():
             if dirent.name != "." and dirent.name != "..":
                 children.append(self.get_all_files(dirent.inode))
-        return {"name": inode.get_name(), "type": inode.get_type(), "children": children}
+        return {"name": inode.get_name(), "type": inode.get_type(), "path": inode.get_path(), "children": children}
 
     def read_fsimage(self):
         if not os.path.exists(NAMENODE_METADATA_DIR):
