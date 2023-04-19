@@ -2,12 +2,21 @@
 <html>
   <head>
     <title>Emulated HDFS</title>
+    <script defer src="./static/script.js"></script>
     <link rel="stylesheet" href="./static/style.css">
   </head>
-  <body>
-    <h1>Emulated HDFS</h1>
-    <div id="tree"></div>
 
-    <script src="./static/script.js"></script>
+  <body>
+    <div id="topBar">
+      <h1>Emulated HDFS</h1>
+      <div id="upload">
+        <form id="uploadForm" method="post" enctype=multipart/form-data>
+          <input type="file" name="uploadFile" required>
+          <input type="text" name="remotePath" placeholder="remote path">
+          <input type="submit" value="Upload">
+        </form>
+      </div>
+    </div>
+    <div id="tree"></div>
   </body>
 </html>

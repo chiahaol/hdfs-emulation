@@ -1,10 +1,12 @@
-import asyncio
+import os
 import sys
 
 sys.path.append("..")
 
 from flask import Flask, request, make_response
 from edfs.edfs_client import EDFSClient
+
+UPLOADED_FILES_DIR = "./upload"
 
 app = Flask(__name__)
 
@@ -31,10 +33,26 @@ async def get_file(filepath):
         response.mimetype = "text/plain"
     return response
 
-@app.route("/upload",  methods=["GET"])
-def upload():
-    print("upload")
-    return {"success": True}
+@app.route('/upload/', methods=["POST"])
+@app.route("/upload/<path:des>",  methods=["POST"])
+async def upload_file(des=""):
+    file = request.files['file']
+
+    if not os.path.exists(UPLOADED_FILES_DIR):
+        os.makedirs(UPLOADED_FILES_DIR)
+
+    src = f'{UPLOADED_FILES_DIR}/{file.filename}'
+    file.save(src)
+
+    edfs_client = await EDFSClient.create()
+    if await edfs_client.put(src, des):
+        response = make_response({"success": True}, 200)
+    else:
+        response = make_response({"success": False}, 200)
+
+    os.remove(src)
+
+    return response
 
 
 if __name__ == '__main__':

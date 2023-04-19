@@ -27,3 +27,38 @@ function createTree(parent, children) {
 getFiles().then(children => {
     createTree(tree, children);
 });
+
+// async function getFile() {
+//   const response = await fetch("http://127.0.0.1:8080/file/user/edfs.py");
+//   s = await response.text()
+//   const anchor = document.createElement("pre");
+//   // anchor.style.wordWrap = "break-word";
+//   anchor.style.whiteSpace = "pre-wrap";
+//   anchor.style.font = "monospace";
+//   anchor.innerHTML = s;
+//   document.body.appendChild(anchor);
+// }
+
+// // getFile().then();
+
+
+const uploadForm = document.getElementById('uploadForm')
+uploadForm.addEventListener('submit', function(e) {
+  e.preventDefault();
+  let file = e.target.uploadFile.files[0];
+  let remotePath = e.target.remotePath.value;
+  console.log(remotePath)
+  let formData = new FormData();
+  formData.append('file', file);
+
+  fetch(`http://127.0.0.1:8080/upload/${remotePath}`, {
+    method: 'POST',
+    body: formData
+  }).then(
+    response => response.json()
+  ).then(
+    data => {
+      console.log(data);
+    }
+  );
+})
