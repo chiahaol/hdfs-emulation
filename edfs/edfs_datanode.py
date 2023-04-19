@@ -63,6 +63,10 @@ class EDFSDataNode:
                 self.recv_acks(writer, nextnode_reader, end_of_pipeline)
             )
             await tasks
+
+            if nextnode_writer:
+                nextnode_writer.close()
+
         elif command == CLI_DATANODE_CMD_READ:
             block_id, offset, num_bytes = request.get("block_id"), request.get("offset"), request.get("num_bytes")
             await self.read_block(writer, block_id, offset, num_bytes)
@@ -94,10 +98,9 @@ class EDFSDataNode:
     async def recv_and_write(self, prevnode_reader, prevnode_writer, nextnode_reader, nextnode_writer, block_id, end_of_pipeline):
         buf = bytearray([])
         block_data = []
+        is_last_packet = False
         while True:
             data = await prevnode_reader.read(BUF_LEN)
-            if not data:
-                break
 
             if not end_of_pipeline:
                 nextnode_writer.write(data)
@@ -109,13 +112,15 @@ class EDFSDataNode:
             decoded_packets = [json.loads(packet.decode()) for packet in packets]
             for decoded_packet in decoded_packets:
                 block_data.append(decoded_packet.get("data"))
+                if decoded_packet.get("is_last_packet_in_block"):
+                    is_last_packet = True
             if end_of_pipeline:
                 seqnos = [packet.get("seqno") for packet in decoded_packets]
                 await self.send_acks(prevnode_writer, seqnos)
             buf = buf[ptr:]
 
-        if nextnode_writer:
-            nextnode_writer.close()
+            if is_last_packet:
+                break
 
         with open(f'{DATANODE_DATA_DIR}/{self.name}/{BlockManager.get_filename_from_block_id(block_id)}', 'w') as f:
             f.write("".join(block_data))
@@ -147,7 +152,9 @@ class EDFSDataNode:
 
     async def read_block(self, writer, block_id, offset, num_bytes):
         filename = BlockManager.get_filename_from_block_id(block_id)
+        print(f'DBG: client requested to read block {block_id} for {num_bytes} bytes from offset {offset}')
         if not os.path.exists(f'{DATANODE_DATA_DIR}/{self.name}/{filename}'):
+            print(f'DBG: block {block_id} does not exist')
             return
         with open(f'{DATANODE_DATA_DIR}/{self.name}/{filename}', 'r') as f:
             f.seek(offset)
@@ -155,12 +162,11 @@ class EDFSDataNode:
             while True:
                 data = f.read(min(DEFAULT_PACKET_DATA_SIZE, num_bytes - cur_num_bytes))
                 if not data:
-                    writer.close()
                     break
                 writer.write(data.encode())
                 await writer.drain()
                 cur_num_bytes += len(data)
-        print(f'DBG: client requested to read block {block_id} for {num_bytes} bytes from offset {offset}')
+
 
     def get_all_block_ids(self):
         return [BlockManager.get_file_block_id(filename) for filename in os.listdir(f'{DATANODE_DATA_DIR}/{self.name}') if filename.startswith(BLOCK_PREFIX)]
