@@ -63,6 +63,10 @@ class EDFSDataNode:
                 self.recv_acks(writer, nextnode_reader, end_of_pipeline)
             )
             await tasks
+
+            if nextnode_writer:
+                nextnode_writer.close()
+
         elif command == CLI_DATANODE_CMD_READ:
             block_id, offset, num_bytes = request.get("block_id"), request.get("offset"), request.get("num_bytes")
             await self.read_block(writer, block_id, offset, num_bytes)
@@ -113,10 +117,6 @@ class EDFSDataNode:
                 seqnos = [packet.get("seqno") for packet in decoded_packets]
                 await self.send_acks(prevnode_writer, seqnos)
             buf = buf[ptr:]
-
-        if nextnode_writer:
-            nextnode_writer.close()
-
         with open(f'{DATANODE_DATA_DIR}/{self.name}/{BlockManager.get_filename_from_block_id(block_id)}', 'w') as f:
             f.write("".join(block_data))
 
@@ -155,7 +155,6 @@ class EDFSDataNode:
             while True:
                 data = f.read(min(DEFAULT_PACKET_DATA_SIZE, num_bytes - cur_num_bytes))
                 if not data:
-                    writer.close()
                     break
                 writer.write(data.encode())
                 await writer.drain()

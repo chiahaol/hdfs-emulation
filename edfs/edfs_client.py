@@ -72,7 +72,6 @@ class EDFSClient:
         await self.dfs.rmdir(path)
         self.dfs.close()
 
-    # TODO: implement this
     async def touch(self, path):
         if not await self.dfs.exists(os.path.dirname(path)):
             print(f'touch: {os.path.dirname(path)}: No such file or directory')
@@ -127,24 +126,26 @@ class EDFSClient:
 
         if not os.path.exists(local_path):
             print(f'put: {local_path}: No such file or directory')
-            return
+            return False
         elif await self.dfs.exists(target_path):
             print(f'put: {target_path}: File exists')
-            return
+            return False
         elif not await self.dfs.exists(os.path.dirname(remote_path)):
             print(f'put: {os.path.dirname(remote_path)}: No such file or directory: hdfs://localhost:9000{os.path.dirname(remote_path)}')
-            return
+            return False
         elif not await self.dfs.is_dir(os.path.dirname(remote_path)):
             print(f'put: {os.path.dirname(remote_path)} (is not a directory)')
-            return
+            return False
 
         out_stream = await self.dfs.create(target_path)
         if not out_stream:
-            return
+            return False
         await out_stream.write(local_path)
         await self.dfs.create_complete(target_path)
         await out_stream.close()
         self.dfs.close()
+
+        return True
 
     # TODO: currently only support file types
     # Should implement recursive get all files in a directory in the future
