@@ -34,26 +34,26 @@ class DataStreamer:
             num_bytes += packet.get_datalen()
             packets_buf.append(packet)
             await self.ack_queue.put(packet)
-            self.data_queue.task_done()
             if packet.is_last_packet_in_block():
                 block_id, blk_locs_info = await self.request_new_block(num_bytes)
                 target = blk_locs_info.pop(0)
                 reader, writer = await self.setup_pipeline(block_id, target, blk_locs_info)
                 ack_task = asyncio.create_task(self.recv_acks(reader))
                 await self.writebock(writer, packets_buf, block_id, blk_locs_info)
-                print(f'DBG: block {block_id} was successfully sent to datanodes {target.get("name")} {" ".join([loc.get("name") for loc in blk_locs_info])}')
                 await self.wait_for_all_ack()
+                print(f'DBG: block {block_id} was successfully sent to datanodes {target.get("name")} {" ".join([loc.get("name") for loc in blk_locs_info])}')
                 ack_task.cancel()
                 writer.close()
                 packets_buf = []
                 num_bytes = 0
+            self.data_queue.task_done()
 
     async def recv_acks(self, nextnode_reader):
         buf = bytearray([])
         while True:
             data = await nextnode_reader.read(BUF_LEN)
             if not data:
-                break
+                continue
             buf += data
 
             packets, ptr = PacketUtils.create_packets_from_buffer(buf)
@@ -97,8 +97,8 @@ class DataStreamer:
         await self.ack_queue.join()
 
     async def finish(self):
-        await self.data_queue.join()
         await self.ack_queue.join()
+        await self.data_queue.join()
         if self.task:
             self.task.cancel()
 

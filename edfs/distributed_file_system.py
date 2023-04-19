@@ -20,7 +20,12 @@ class DistributedFileSystem:
         writer.write(message.encode())
         await writer.drain()
 
-        data = await reader.read(BUF_LEN)
+        data = bytearray([])
+        while True:
+            buf = await reader.read(BUF_LEN)
+            if not buf:
+                break
+            data += buf
         writer.close()
 
         response = json.loads(data.decode())

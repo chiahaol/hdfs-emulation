@@ -107,10 +107,10 @@ class EDFSClient:
         if not in_stream:
             return
         buf = bytearray([])
-        while (await in_stream.read(buf)) > 0:
+        while (await in_stream.read(buf)) >= 0:
             if len(buf) >= BUF_LEN:
                 print(buf.decode(), end="")
-                buf = []
+                buf = bytearray([])
         print(buf.decode(), end="")
 
         in_stream.close()
@@ -166,7 +166,7 @@ class EDFSClient:
             while (await in_stream.read(buf)) > 0:
                 if len(buf) >= BUF_LEN:
                     f.write(buf.decode())
-                    buf = []
+                    buf = bytearray([])
             f.write(buf.decode())
 
         in_stream.close()
