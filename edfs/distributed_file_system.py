@@ -31,6 +31,34 @@ class DistributedFileSystem:
 
         return None
 
+    async def mkdir(self, path):
+        reader, writer = await asyncio.open_connection(
+            LOCAL_HOST, NAMENODE_PORT
+        )
+
+        message = json.dumps({"cmd": CMD_MKDIR, "path": path})
+        writer.write(message.encode())
+        await writer.drain()
+
+        data = await reader.read(BUF_LEN)
+        response = json.loads(data.decode())
+        success = response.get("success")
+
+    async def rmdir(self, path):
+        reader, writer = await asyncio.open_connection(
+            LOCAL_HOST, NAMENODE_PORT
+        )
+
+        message = json.dumps({"cmd": CMD_RMDIR, "path": path})
+        writer.write(message.encode())
+        await writer.drain()
+
+        data = await reader.read(BUF_LEN)
+        response = json.loads(data.decode())
+        success = response.get("success")
+        if not success:
+            print(response.get("msg"))
+
     async def create(self, path):
         reader, writer = await asyncio.open_connection(
             LOCAL_HOST, NAMENODE_PORT
@@ -115,6 +143,22 @@ class DistributedFileSystem:
         writer.close()
         return is_dir
 
+    async def is_dir_empty(self, path):
+        reader, writer = await asyncio.open_connection(
+            LOCAL_HOST, NAMENODE_PORT
+        )
+
+        message = json.dumps({"cmd": CMD_IS_DIR_EMPTY, "path": path})
+        writer.write(message.encode())
+        await writer.drain()
+
+        data = await reader.read(BUF_LEN)
+        response = json.loads(data.decode())
+        is_dir_empty = response.get("is_dir_empty")
+
+        writer.close()
+        return is_dir_empty
+
     async def is_identical(self, path1, path2):
         reader, writer = await asyncio.open_connection(
             LOCAL_HOST, NAMENODE_PORT
@@ -129,3 +173,19 @@ class DistributedFileSystem:
 
         writer.close()
         return response.get("is_identical")
+
+    async def is_root_dir(self, path):
+        reader, writer = await asyncio.open_connection(
+            LOCAL_HOST, NAMENODE_PORT
+        )
+
+        message = json.dumps({"cmd": CMD_IS_ROOT_DIR, "path": path})
+        writer.write(message.encode())
+        await writer.drain()
+
+        data = await reader.read(BUF_LEN)
+        response = json.loads(data.decode())
+        is_root = response.get("is_root")
+
+        writer.close()
+        return is_root

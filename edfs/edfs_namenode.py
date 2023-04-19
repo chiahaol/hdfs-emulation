@@ -21,6 +21,10 @@ class EDFSNameNode:
 
     async def handle_client(self, reader, writer):
         data = await reader.read(BUF_LEN)
+        if not data:
+            writer.close()
+            return
+
         request = json.loads(data.decode())
         command = request.get("cmd")
         if command == CMD_LS:
@@ -51,6 +55,10 @@ class EDFSNameNode:
             await self.is_dir(writer, request)
         elif command == CMD_IS_IDENTICAL:
             await self.is_identical(writer, request)
+        elif command == CMD_IS_ROOT_DIR:
+            await self.is_root_dir(writer, request)
+        elif command == CMD_IS_DIR_EMPTY:
+            await self.is_dir_empty(writer, request)
 
         writer.close()
 
@@ -75,35 +83,22 @@ class EDFSNameNode:
 
     async def mkdir(self, writer, path):
         base_dir_inode, filename = self.im.get_baseinode_and_filename(path)
-        if base_dir_inode is None:
-            response = {"success": False, "msg": f'mkdir: {os.path.dirname(path.strip(" /"))}: No such file or directory'}
-        elif filename == "" or base_dir_inode.get_child_inode_by_name(filename) != None:
-            response = {"success": False, "msg": f'mkdir: {path}: File exists'}
-        else:
-            new_dir_inode = self.im.create_dir(base_dir_inode, filename)
-            log = {"edit_type": EDIT_TYPE_MKDIR, "parent": base_dir_inode.get_id(), "name": new_dir_inode.get_name()}
-            self.elm.write_log(log)
-            response = {"success": True, "msg": f'mkdir: {path}: successfully created with inode number {new_dir_inode.get_id()}'}
+
+        new_dir_inode = self.im.create_dir(base_dir_inode, filename)
+        log = {"edit_type": EDIT_TYPE_MKDIR, "parent": base_dir_inode.get_id(), "name": new_dir_inode.get_name()}
+        self.elm.write_log(log)
+        response = {"success": True, "msg": f'mkdir: {path}: successfully created with inode number {new_dir_inode.get_id()}'}
 
         writer.write(json.dumps(response).encode())
         await writer.drain()
 
     async def rmdir(self, writer, path):
         inode = self.im.get_inode_from_path(path)
-        if inode == self.im.root_inode:
-            response = {"success": False, "msg": f'rmdir: Can not remvoe the toot directory'}
-        elif inode is None:
-            response = {"success": False, "msg": f'rmdir: {path}: No such file or directory'}
-        elif inode.is_file():
-            response = {"success": False, "msg": f'rmdir: {path}: Is not a directory'}
-        elif len(inode.get_dirents()) > 2:
-            response = {"success": False, "msg": f'rmdir: {path}: Directory is not empty'}
-        else:
-            parent = inode.get_parent_inode()
-            self.im.remove_dir(parent, inode)
-            log = {"edit_type": EDIT_TYPE_RMDIR, "parent": parent.get_id(), "remove": inode.get_id(), "name": inode.get_name()}
-            self.elm.write_log(log)
-            response = {"success": True, "msg": f'rmdir: {path}: successfully removed the directory'}
+        parent = inode.get_parent_inode()
+        self.im.remove_dir(parent, inode)
+        log = {"edit_type": EDIT_TYPE_RMDIR, "parent": parent.get_id(), "remove": inode.get_id(), "name": inode.get_name()}
+        self.elm.write_log(log)
+        response = {"success": True, "msg": f'rmdir: {path}: successfully removed the directory'}
 
         writer.write(json.dumps(response).encode())
         await writer.drain()
@@ -152,6 +147,17 @@ class EDFSNameNode:
 
         print(f'DBG: {src} is successfully moved to {des}')
 
+    async def is_root_dir(self, writer, request):
+        path = request.get("path")
+        inode = self.im.get_inode_from_path(path)
+        if inode == self.im.root_inode:
+            response = {"is_root": True}
+        else:
+            response = {"is_root": False}
+
+        writer.write(json.dumps(response).encode())
+        await writer.drain()
+
     async def exists(self, writer, request):
         path = request.get("path")
         inode = self.im.get_inode_from_path(path)
@@ -170,6 +176,17 @@ class EDFSNameNode:
             response = {"is_dir": False}
         else:
             response = {"is_dir": True}
+
+        writer.write(json.dumps(response).encode())
+        await writer.drain()
+
+    async def is_dir_empty(self, writer, request):
+        path = request.get("path")
+        inode = self.im.get_inode_from_path(path)
+        if inode is None or inode.is_file() or len(inode.get_dirents()) > 2:
+            response = {"is_dir_empty": False}
+        else:
+            response = {"is_dir_empty": True}
 
         writer.write(json.dumps(response).encode())
         await writer.drain()

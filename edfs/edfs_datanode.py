@@ -155,6 +155,7 @@ class EDFSDataNode:
             while True:
                 data = f.read(min(DEFAULT_PACKET_DATA_SIZE, num_bytes - cur_num_bytes))
                 if not data:
+                    writer.close()
                     break
                 writer.write(data.encode())
                 await writer.drain()

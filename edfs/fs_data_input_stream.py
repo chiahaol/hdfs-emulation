@@ -10,7 +10,7 @@ class FSDataInputStream:
         self.block_num = 0
         self.reader = None
         self.writer = None
-        print(self.block_locations)
+        # print(self.block_locations)
     def close(self):
         pass
 

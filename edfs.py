@@ -33,7 +33,10 @@ async def main():
         path = sys.argv[2]
         await edfs_client.rmdir(path)
     elif command == CLI_TOUCH:
-        await edfs_client.touch()
+        if len(sys.argv) < 3:
+            print("-touch: Not enough arguments: expected 1 but got 0")
+            exit(-1)
+        await edfs_client.touch(sys.argv[2])
     elif command == CLI_RM:
         if len(sys.argv) < 3:
             print("-rm: Not enough arguments: expected 1 but got 0")

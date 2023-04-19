@@ -45,35 +45,47 @@ class EDFSClient:
                 print(ent)
 
     async def mkdir(self, path):
-        message = json.dumps({"cmd": CMD_MKDIR, "path": path})
-        self.namenode_writer.write(message.encode())
-        await self.namenode_writer.drain()
+        if await self.dfs.exists(path):
+            print(f'mkdir: {path}: File exists')
+            return
+        elif not await self.dfs.exists(os.path.dirname(path.strip(" /"))):
+            print(f'mkdir: {os.path.dirname(path.strip(" /"))}: No such file or directory')
+            return
 
-        data = await self.namenode_reader.read(BUF_LEN)
-        response = json.loads(data.decode())
-        success = response.get("success")
-        if not success:
-            print(response.get("msg"))
+        await self.dfs.mkdir(path)
+        self.dfs.close()
 
     async def rmdir(self, path):
-        message = json.dumps({"cmd": CMD_RMDIR, "path": path})
-        self.namenode_writer.write(message.encode())
-        await self.namenode_writer.drain()
+        if await self.dfs.is_root_dir(path):
+            print(f'rmdir: Can not remvoe the root directory')
+            return
+        elif not await self.dfs.exists(path):
+            print(f'rmdir: {path}: No such file or directory')
+            return
+        elif not await self.dfs.is_dir(path):
+            print(f'rmdir: {path}: Is not a directory')
+            return
+        elif not await self.dfs.is_dir_empty(path):
+            print(f'rmdir: {path}: Directory is not empty')
+            return
 
-        data = await self.namenode_reader.read(BUF_LEN)
-        response = json.loads(data.decode())
-        success = response.get("success")
-        if not success:
-            print(response.get("msg"))
+        await self.dfs.rmdir(path)
+        self.dfs.close()
 
     # TODO: implement this
-    async def touch(self):
-        message = "touch"
-        self.namenode_writer.write(message.encode())
-        await self.namenode_writer.drain()
+    async def touch(self, path):
+        if not await self.dfs.exists(os.path.dirname(path)):
+            print(f'touch: {os.path.dirname(path)}: No such file or directory')
+            return
+        elif await self.dfs.is_dir(path):
+            print(f'touch: {path}: Is a directory')
+            return
+        elif await self.dfs.exists(path):
+            return
 
-        data = await self.namenode_reader.read(100)
-        print(f'{data.decode()!r}')
+        out_stream = await self.dfs.create(path)
+        await out_stream.close()
+        self.dfs.close()
 
     async def rm(self, path):
         if not await self.dfs.exists(path):
