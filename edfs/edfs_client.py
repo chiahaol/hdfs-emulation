@@ -191,6 +191,21 @@ class EDFSClient:
 
         return {"success": True, "file": buf.decode()}
 
+    async def get_block(self, blk_name):
+        in_stream = await self.dfs.open_block(blk_name)
+        if not in_stream:
+            return {"success": False}
+
+        buf = bytearray([])
+        while (await in_stream.read(buf)) > 0:
+            continue
+
+        in_stream.close()
+        self.dfs.close()
+
+        return {"success": True, "block": buf.decode()}
+
+
     async def mv(self, src, des):
         if not await self.dfs.exists(src):
             print(f'mv: {src}: No such file or directory')
@@ -257,3 +272,13 @@ class EDFSClient:
         response = json.loads(data.decode())
         success = response.get("success")
         return response.get("files")
+
+    async def get_file_blk_names(self, filepath):
+        message = json.dumps({"cmd": CMD_GET_FILE_BLK_NAMES, "path": filepath})
+        self.namenode_writer.write(message.encode())
+        await self.namenode_writer.drain()
+
+        data = await self.namenode_reader.read(BUF_LEN)
+        response = json.loads(data.decode())
+        success = response.get("success")
+        return response.get("blocks")

@@ -17,6 +17,16 @@
         </form>
       </div>
     </div>
-    <div id="tree"></div>
+    <div id="mainContent">
+      <div id="tree"></div>
+      <div id="treeLoader" class="loader" hidden></div>
+      <div id="fileSection">
+        <div id="fileInfo">
+          <div id="fileName"><span></span></div>
+          <button id="download" onclick="downloadFile()">Download</button>
+        </div>
+        <pre id="fileContent"></pre>
+      </div>
+    </div>
   </body>
 </html>

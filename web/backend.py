@@ -20,6 +20,13 @@ async def get_all_files():
     files = await edfs_client.get_all_files()
     return files
 
+@app.route("/blocks/<path:filepath>",  methods=["GET"])
+async def get_blocks(filepath):
+    edfs_client = await EDFSClient.create()
+    blocks = await edfs_client.get_file_blk_names(filepath)
+    print(blocks)
+    return blocks
+
 @app.route("/file/<path:filepath>",  methods=["GET"])
 async def get_file(filepath):
     print(filepath)
@@ -29,6 +36,18 @@ async def get_file(filepath):
          response = make_response("", 404)
     else:
         content = data.get("file")
+        response = make_response(content, 200)
+        response.mimetype = "text/plain"
+    return response
+
+@app.route("/block/<path:blockname>",  methods=["GET"])
+async def get_block(blockname):
+    edfs_client = await EDFSClient.create()
+    data = await edfs_client.get_block(blockname)
+    if not data.get("success"):
+         response = make_response("", 404)
+    else:
+        content = data.get("block")
         response = make_response(content, 200)
         response.mimetype = "text/plain"
     return response

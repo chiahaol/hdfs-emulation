@@ -45,8 +45,8 @@ class EDFSNameNode:
             await self.register_datanode(writer, request)
         elif command == CMD_ADD_BLOCK:
             await self.add_block(writer, request)
-        elif command == CMD_GET_BLOCK_LOCATIONS:
-            await self.get_block_locations(writer, request)
+        elif command == CMD_GET_FILE_BLOCKS_LOCATIONS:
+            await self.get_file_blocks_locations(writer, request)
         elif command == CMD_CREATE_COMPLETE:
             await self.create_complete(request)
         elif command == CMD_FILE_EXISTS:
@@ -59,6 +59,10 @@ class EDFSNameNode:
             await self.is_root_dir(writer, request)
         elif command == CMD_IS_DIR_EMPTY:
             await self.is_dir_empty(writer, request)
+        elif command == CMD_GET_FILE_BLK_NAMES:
+            await self.get_block_names(writer, request)
+        elif command == CMD_GET_BLOCK_LOCATIONS:
+            await self.get_block_locations(writer, request)
 
         writer.close()
 
@@ -313,7 +317,7 @@ class EDFSNameNode:
         datanodes = self.dnm.get_all_datanodes()
         return random.sample(datanodes, num)
 
-    async def get_block_locations(self, writer, request):
+    async def get_file_blocks_locations(self, writer, request):
         path = request.get("path")
         inode = self.im.get_inode_from_path(path)
         if inode is None:
@@ -333,5 +337,30 @@ class EDFSNameNode:
                 block_locations.append({"block_id": block_id, "num_bytes": blk.get_num_bytes(), "locs": locs})
 
             response = {"success": True, "block_locations": block_locations}
+        writer.write(json.dumps(response).encode())
+        await writer.drain()
+
+    async def get_block_locations(self, writer, request):
+        blk_name = request.get("block_name")
+        blk_id = BlockManager.get_file_block_id(blk_name)
+        blk = self.bm.get_block_by_id(blk_id)
+        if not blk:
+            response = {"success": False}
+        else:
+            locs = []
+            datanode_ids = blk.get_locs()
+            for datanode_id in datanode_ids:
+                datanode_info = self.dnm.get_datanode_by_id(datanode_id)
+                locs.append(datanode_info.get_info())
+            response = {"success": True, "block_locations": [{"block_id": blk_id, "num_bytes": blk.get_num_bytes(), "locs": locs}]}
+        writer.write(json.dumps(response).encode())
+        await writer.drain()
+
+    async def get_block_names(self, writer, request):
+        path = request.get("path")
+        inode = self.im.get_inode_from_path(path)
+        block_ids = inode.get_blocks()
+        block_names = [BlockManager.get_filename_from_block_id(block_id) for block_id in block_ids]
+        response = {"success": True, "blocks": block_names}
         writer.write(json.dumps(response).encode())
         await writer.drain()

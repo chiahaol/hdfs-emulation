@@ -16,7 +16,7 @@ class DistributedFileSystem:
         reader, writer = await asyncio.open_connection(
             LOCAL_HOST, NAMENODE_PORT
         )
-        message = json.dumps({"cmd": CMD_GET_BLOCK_LOCATIONS, "path": path})
+        message = json.dumps({"cmd": CMD_GET_FILE_BLOCKS_LOCATIONS, "path": path})
         writer.write(message.encode())
         await writer.drain()
 
@@ -34,6 +34,22 @@ class DistributedFileSystem:
             block_locations = response.get("block_locations")
             return FSDataInputStream(block_locations)
 
+        return None
+
+    async def open_block(self, blk_name):
+        reader, writer = await asyncio.open_connection(
+            LOCAL_HOST, NAMENODE_PORT
+        )
+        message = json.dumps({"cmd": CMD_GET_BLOCK_LOCATIONS, "block_name": blk_name})
+        writer.write(message.encode())
+        await writer.drain()
+
+        data = await reader.read(BUF_LEN)
+        response = json.loads(data.decode())
+        success = response.get("success")
+        if success:
+            block_locations = response.get("block_locations")
+            return FSDataInputStream(block_locations)
         return None
 
     async def mkdir(self, path):
