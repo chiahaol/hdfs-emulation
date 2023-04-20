@@ -32,7 +32,7 @@ example:
 After starting up the namenode and datanodes, go to the web directory\
 ```cd web```
 ### start up backend API
-```python3 backend.py```\
+```python3 backend.py```
 
 ### access webpage
 [http://127.0.0.1:8080](http://127.0.0.1:8080)
