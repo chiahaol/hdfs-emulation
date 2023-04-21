@@ -75,11 +75,11 @@ class EDFSNameNode:
 
         entries = []
         if inode.is_file():
-            entries.append(inode.get_path())
+            entries.append(inode.get_info())
         else:
             for dirent in inode.get_dirents():
                 if dirent.name != "." and dirent.name != "..":
-                    entries.append(dirent.inode.get_path())
+                    entries.append(dirent.inode.get_info())
 
         response = {"success": True, "entries": entries}
         writer.write(json.dumps(response).encode())
@@ -295,7 +295,7 @@ class EDFSNameNode:
         inode_id = request.get("inode_id")
         num_bytes = request.get("num_bytes")
         blk = self.bm.allocate_block_for(inode_id, num_bytes)
-        self.im.add_block_to(inode_id, blk.get_id())
+        self.im.add_block_to(inode_id, blk.get_id(), blk.get_num_bytes())
         blk_locs = self.select_block_locs(REPLICATION_FACTOR)
         blk_locs_info = []
         for datanode_info in blk_locs:

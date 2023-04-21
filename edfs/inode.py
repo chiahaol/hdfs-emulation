@@ -1,10 +1,11 @@
 from edfs.config import *
 
 class Inode:
-    def __init__(self, id, type, name, replication=0, preferredBlockSize=0, blocks=None):
+    def __init__(self, id, type, name, replication=0, preferredBlockSize=0, blocks=None, numbytes=0):
         self.id = id
         self.type = type
         self.name = name
+        self.num_bytes = numbytes
         self.replication = replication
         self.preferredBlockSize = preferredBlockSize
         self.blocks = blocks if blocks is not None else []
@@ -22,6 +23,9 @@ class Inode:
     def get_name(self):
         return self.name
 
+    def get_num_bytes(self):
+        return self.num_bytes
+
     def get_type(self):
         return self.type
 
@@ -36,6 +40,15 @@ class Inode:
 
     def get_dirents(self):
         return self.dir_entries
+
+    def get_info(self):
+        info = self.type
+        s_num_bytes = str(self.num_bytes)
+        if self.is_dir():
+            info = f'{self.type}{" " * 10}{s_num_bytes} {self.get_path()}'
+        else:
+            info = f'{self.type}{" " * (16 - len(s_num_bytes))}{s_num_bytes} {self.get_path()}'
+        return info
 
     def set_name(self, name):
         self.name = name

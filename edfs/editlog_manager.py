@@ -55,7 +55,7 @@ class EditLogManager:
         inode_id, block_id, num_bytes = log.get("inode_id"), log.get("block_id"), log.get("num_bytes")
         blk = Block(block_id, inode_id, num_bytes, [])
         self.bm.register_block(blk)
-        self.im.add_block_to(inode_id, block_id)
+        self.im.add_block_to(inode_id, block_id, num_bytes)
 
     def process_rm_editlog(self, log):
         inode_id = log.get("inode_id")

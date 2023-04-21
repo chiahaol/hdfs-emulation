@@ -18,8 +18,9 @@ class InodeManager():
             if inode["type"] == DIR_TYPE:
                 node = Inode(inode["id"], inode["type"], inode["name"])
             else:
-                blocks = [blk.get("id") for blk in inode.get("blocks")]
-                node = Inode(inode["id"], inode["type"], inode["name"], inode["replication"], inode["preferredBlockSize"], blocks)
+                block_ids = [blk.get("id") for blk in inode.get("blocks")]
+                num_bytes = sum([blk.get("numBytes") for blk in inode.get("blocks")])
+                node = Inode(inode["id"], inode["type"], inode["name"], inode["replication"], inode["preferredBlockSize"], block_ids, num_bytes)
             self.id_to_inode[node.get_id()] = node
             if node.get_name() == ROOT_DIR_NAME:
                 self.root_inode = node
@@ -122,9 +123,10 @@ class InodeManager():
         src_inode.set_name(name)
         des_inode.add_dirent(src_inode, name)
 
-    def add_block_to(self, inode_id, block_id):
+    def add_block_to(self, inode_id, block_id, num_bytes):
         inode = self.get_inode_by_id(inode_id)
         inode.add_block(block_id)
+        inode.num_bytes += num_bytes
 
     def print_entries(self, dir_inode):
         dir_path = dir_inode.get_path()
