@@ -150,18 +150,25 @@ class EDFSClient:
     # TODO: currently only support file types
     # Should implement recursive get all files in a directory in the future
     async def get(self, remote_path, local_path):
-        if os.path.exists(local_path):
-            print(f'get: {local_path}: File exists')
+        target_path = local_path
+        if os.path.isdir(local_path):
+            target_path = f'{local_path}/{os.path.basename(remote_path.strip(" /"))}'
+
+        if os.path.exists(target_path):
+            print(f'get: {target_path}: File exists')
             return
         if not await self.dfs.exists(remote_path):
             print(f'get: {remote_path}: No such file or directory')
+            return
+        if await self.dfs.is_dir(remote_path):
+            print(f'get: {remote_path}: Is a directory')
             return
 
         in_stream = await self.dfs.open(remote_path)
         if not in_stream:
             return
 
-        with open(local_path, 'a') as f:
+        with open(target_path, 'a') as f:
             buf = bytearray([])
             while (await in_stream.read(buf)) > 0:
                 if len(buf) >= BUF_LEN:
