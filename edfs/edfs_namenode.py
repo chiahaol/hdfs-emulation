@@ -69,7 +69,7 @@ class EDFSNameNode:
     async def ls(self, writer, path):
         inode = self.im.get_inode_from_path(path)
         if inode is None:
-            response = {"success": False, "msg": f'ls: {path}: No such file or directory'}
+            response = {"success": False, "error": ERR_FILE_NOT_FOUND}
             writer.write(json.dumps(response).encode())
             return
 
@@ -81,7 +81,7 @@ class EDFSNameNode:
                 if dirent.name != "." and dirent.name != "..":
                     entries.append(dirent.inode.get_info())
 
-        response = {"success": True, "entries": entries}
+        response = {"success": True, "files": entries}
         writer.write(json.dumps(response).encode())
         await writer.drain()
 
@@ -211,7 +211,7 @@ class EDFSNameNode:
     async def tree(self, writer, path):
         inode = self.im.get_inode_from_path(path)
         if inode is None:
-            response = {"success": False, "msg": f'tree: {path}: No such file or directory'}
+            response = {"success": False, "error": ERR_FILE_NOT_FOUND}
             writer.write(json.dumps(response).encode())
             return
         response = {"success": True, "files": self.get_all_files(inode)}
@@ -296,7 +296,7 @@ class EDFSNameNode:
         num_bytes = request.get("num_bytes")
         blk = self.bm.allocate_block_for(inode_id, num_bytes)
         self.im.add_block_to(inode_id, blk.get_id(), blk.get_num_bytes())
-        blk_locs = self.select_block_locs(REPLICATION_FACTOR)
+        blk_locs = self.select_block_locs(DEFAULT_REPLICATION_FACTOR)
         blk_locs_info = []
         for datanode_info in blk_locs:
             blk_locs_info.append(datanode_info.get_info())

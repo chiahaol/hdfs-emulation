@@ -5,44 +5,30 @@ import sys
 
 from edfs.config import *
 from edfs.distributed_file_system import DistributedFileSystem
-from edfs.fs_data_output_stream import FSDataOutputStream
-
 
 class EDFSClient:
-    @classmethod
-    async def create(cls):
-        self = EDFSClient()
-        self.namenode_reader, self.namenode_writer = await asyncio.open_connection(
-            LOCAL_HOST, NAMENODE_PORT
-        )
-        return self
-
     def __init__(self):
         self.dfs = DistributedFileSystem()
 
     def close(self):
-        if self.namenode_writer:
-            self.namenode_writer.close()
         self.dfs.close()
 
     async def ls(self, path):
-        message = json.dumps({"cmd": CMD_LS, "path": path})
-        self.namenode_writer.write(message.encode())
-        await self.namenode_writer.drain()
+        files = await self.dfs.listdir(path)
+        if files is None:
+            print(f'ls: {path}: No such file or directory')
+            return
 
-        data = await  self.namenode_reader.read(BUF_LEN)
-        response = json.loads(data.decode())
-        success = response.get("success")
-        if not success:
-            print(response.get("msg"))
-        else:
-            entries = response.get("entries")
-            if not entries:
-                return
-
-            print(f'Found {len(entries)} items')
-            for ent in entries:
-                print(ent)
+        if files:
+            print(f'Found {len(files)} items')
+        for file in files:
+            file_type = file.get("type")
+            num_bytes = str(file.get("numBytes"))
+            file_path = file.get("path")
+            if file_type == DIR_TYPE:
+                print(f'{file_type}{" " * 10}{num_bytes} {file_path}')
+            else:
+                print(f'{file_type}{" " * (16 - len(num_bytes))}{num_bytes} {file_path}')
 
     async def mkdir(self, path):
         if await self.dfs.exists(path):
@@ -243,49 +229,29 @@ class EDFSClient:
         await self.dfs.mv(src, target)
 
     async def tree(self, path):
-        message = json.dumps({"cmd": CMD_TREE, "path": path})
-        self.namenode_writer.write(message.encode())
-        await self.namenode_writer.drain()
+        files = await self.dfs.listdir_recursive(path)
+        if files is None:
+            print(f'ls: {path}: No such file or directory')
+            return
 
-        data = await self.namenode_reader.read(BUF_LEN)
-        response = json.loads(data.decode())
-        success = response.get("success")
-        if not success:
-            print(response.get("msg"))
-        else:
-            root = response.get("files")
-            output = []
-            self.tree_helper(root, 0, output)
-            print("\n".join(output))
+        output = []
+        self.tree_helper(files, 0, output)
+        print("\n".join(output))
 
-    def tree_helper(self, file, level, output):
-        _name = file.get("name")
-        _type = file.get("type")
+    def tree_helper(self, files, level, output):
+        for file in files:
+            filename = file.get("name")
+            file_type = file.get("type")
 
-        if _type == FILE_TYPE:
-            output.append(f'{"    " * level}{_name}')
-        else:
-            output.append(f'{"    " * level}{_name}:')
-            children = file.get("children")
-            for child in children:
-                self.tree_helper(child, level + 1, output)
+            if file_type == FILE_TYPE:
+                output.append(f'{"    " * level}{filename}')
+            else:
+                output.append(f'{"    " * level}{filename}:')
+                children = file.get("children")
+                self.tree_helper(children, level + 1, output)
 
     async def get_all_files(self):
-        message = json.dumps({"cmd": CMD_TREE, "path": "/"})
-        self.namenode_writer.write(message.encode())
-        await self.namenode_writer.drain()
-
-        data = await self.namenode_reader.read(BUF_LEN)
-        response = json.loads(data.decode())
-        success = response.get("success")
-        return response.get("files")
+        return await self.dfs.listdir_recursive()
 
     async def get_file_blk_names(self, filepath):
-        message = json.dumps({"cmd": CMD_GET_FILE_BLK_NAMES, "path": filepath})
-        self.namenode_writer.write(message.encode())
-        await self.namenode_writer.drain()
-
-        data = await self.namenode_reader.read(BUF_LEN)
-        response = json.loads(data.decode())
-        success = response.get("success")
-        return response.get("blocks")
+        return await self.dfs.get_file_blocks(filepath)

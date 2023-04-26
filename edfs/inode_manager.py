@@ -90,7 +90,7 @@ class InodeManager():
         del self.id_to_inode[inode.get_id()]
 
     def create_file(self, base_inode, filename):
-        new_dir_inode = Inode(self.last_inode_id + 1, FILE_TYPE, filename, 3, DEFAULT_BLOCK_SZIE, None)
+        new_dir_inode = Inode(self.last_inode_id + 1, FILE_TYPE, filename, DEFAULT_REPLICATION_FACTOR, DEFAULT_BLOCK_SZIE, None)
         base_inode.add_dirent(new_dir_inode, filename)
         new_dir_inode.add_dirent(base_inode, "..")
         self.id_to_inode[new_dir_inode.get_id()] = new_dir_inode

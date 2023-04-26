@@ -14,7 +14,7 @@ async def main():
         print("Please provide a edfs command!")
         exit(-1)
 
-    edfs_client = await EDFSClient.create()
+    edfs_client = EDFSClient()
 
     command = sys.argv[1]
     if command == CLI_LS:

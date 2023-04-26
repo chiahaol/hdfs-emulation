@@ -16,13 +16,13 @@ def root():
 
 @app.route("/files",  methods=["GET"])
 async def get_all_files():
-    edfs_client = await EDFSClient.create()
+    edfs_client = EDFSClient()
     files = await edfs_client.get_all_files()
     return files
 
 @app.route("/blocks/<path:filepath>",  methods=["GET"])
 async def get_blocks(filepath):
-    edfs_client = await EDFSClient.create()
+    edfs_client = EDFSClient()
     blocks = await edfs_client.get_file_blk_names(filepath)
     print(blocks)
     return blocks
@@ -30,7 +30,7 @@ async def get_blocks(filepath):
 @app.route("/file/<path:filepath>",  methods=["GET"])
 async def get_file(filepath):
     print(filepath)
-    edfs_client = await EDFSClient.create()
+    edfs_client = EDFSClient()
     data = await edfs_client.get_file(filepath)
     if not data.get("success"):
          response = make_response("", 404)
@@ -42,7 +42,7 @@ async def get_file(filepath):
 
 @app.route("/block/<path:blockname>",  methods=["GET"])
 async def get_block(blockname):
-    edfs_client = await EDFSClient.create()
+    edfs_client = EDFSClient()
     data = await edfs_client.get_block(blockname)
     if not data.get("success"):
          response = make_response("", 404)
@@ -63,7 +63,7 @@ async def upload_file(des=""):
     src = f'{UPLOADED_FILES_DIR}/{file.filename}'
     file.save(src)
 
-    edfs_client = await EDFSClient.create()
+    edfs_client = EDFSClient()
     if await edfs_client.put(src, des):
         response = make_response({"success": True}, 200)
     else:

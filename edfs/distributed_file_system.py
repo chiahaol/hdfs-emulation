@@ -20,15 +20,15 @@ class DistributedFileSystem:
         writer.write(message.encode())
         await writer.drain()
 
-        data = bytearray([])
+        buf = bytearray([])
         while True:
-            buf = await reader.read(BUF_LEN)
-            if not buf:
+            data = await reader.read(BUF_LEN)
+            if not data:
                 break
-            data += buf
+            buf += data
         writer.close()
 
-        response = json.loads(data.decode())
+        response = json.loads(buf.decode())
         success = response.get("success")
         if success:
             block_locations = response.get("block_locations")
@@ -45,12 +45,86 @@ class DistributedFileSystem:
         await writer.drain()
 
         data = await reader.read(BUF_LEN)
+
+        writer.close()
+
         response = json.loads(data.decode())
         success = response.get("success")
         if success:
             block_locations = response.get("block_locations")
             return FSDataInputStream(block_locations)
         return None
+
+    async def get_file_blocks(self, path):
+        reader, writer = await asyncio.open_connection(
+            LOCAL_HOST, NAMENODE_PORT
+        )
+        message = json.dumps({"cmd": CMD_GET_FILE_BLK_NAMES, "path": path})
+        writer.write(message.encode())
+        await writer.drain()
+
+        buf = bytearray([])
+        while True:
+            data = await reader.read(BUF_LEN)
+            if not data:
+                break
+            buf += data
+
+        writer.close()
+
+        response = json.loads(buf.decode())
+        return response.get("blocks")
+
+    async def listdir(self, path):
+        reader, writer = await asyncio.open_connection(
+            LOCAL_HOST, NAMENODE_PORT
+        )
+
+        message = json.dumps({"cmd": CMD_LS, "path": path})
+        writer.write(message.encode())
+        await writer.drain()
+
+        buf = bytearray([])
+        while True:
+            data = await reader.read(BUF_LEN)
+            if not data:
+                break
+            buf += data
+
+        writer.close()
+
+        response = json.loads(buf.decode())
+
+        if not response.get("success"):
+            return None
+
+        return response.get("files")
+
+    async def listdir_recursive(self, path=""):
+        reader, writer = await asyncio.open_connection(
+            LOCAL_HOST, NAMENODE_PORT
+        )
+
+        message = json.dumps({"cmd": CMD_TREE, "path": path})
+        writer.write(message.encode())
+        await writer.drain()
+
+        buf = bytearray([])
+        while True:
+            data = await reader.read(BUF_LEN)
+            if not data:
+                break
+            buf += data
+
+        writer.close()
+
+        response = json.loads(buf.decode())
+
+        if not response.get("success"):
+            return None
+
+        return response.get("files").get("children")
+
 
     async def mkdir(self, path):
         reader, writer = await asyncio.open_connection(
@@ -64,6 +138,7 @@ class DistributedFileSystem:
         data = await reader.read(BUF_LEN)
         response = json.loads(data.decode())
         success = response.get("success")
+        writer.close()
 
     async def rmdir(self, path):
         reader, writer = await asyncio.open_connection(
@@ -77,8 +152,8 @@ class DistributedFileSystem:
         data = await reader.read(BUF_LEN)
         response = json.loads(data.decode())
         success = response.get("success")
-        if not success:
-            print(response.get("msg"))
+
+        writer.close()
 
     async def create(self, path):
         reader, writer = await asyncio.open_connection(

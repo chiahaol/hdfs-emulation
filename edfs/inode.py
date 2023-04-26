@@ -42,13 +42,7 @@ class Inode:
         return self.dir_entries
 
     def get_info(self):
-        info = self.type
-        s_num_bytes = str(self.num_bytes)
-        if self.is_dir():
-            info = f'{self.type}{" " * 10}{s_num_bytes} {self.get_path()}'
-        else:
-            info = f'{self.type}{" " * (16 - len(s_num_bytes))}{s_num_bytes} {self.get_path()}'
-        return info
+        return {"type": self.type, "numBytes": self.num_bytes, "path": self.get_path()}
 
     def set_name(self, name):
         self.name = name

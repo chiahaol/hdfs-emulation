@@ -15,7 +15,7 @@ function reloadFiles() {
   document.getElementById("treeLoader").style.display = "block";
   getFiles().then(files => {
     document.getElementById("treeLoader").style.display = "none";
-    createTree(tree, files.children);
+    createTree(tree, files);
   });
 }
 

@@ -71,8 +71,6 @@ class DataStreamer:
                 "seqno": packet.get_seqno(),
                 "data": packet.get_data(),
                 "is_last_packet_in_block": packet.is_last_packet_in_block(),
-                "block_id": block_id,
-                "next_datanodes": next_datanodes
             }
             writer.write(PacketUtils.encode(json.dumps(buf).encode()))
             await writer.drain()
